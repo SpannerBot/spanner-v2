@@ -91,4 +91,4 @@ if args.force_setup:
     main()
 
 if args.enforce_cwd:
-    os.chdir(Path(__file__) / ".." / "..")
+    os.chdir(Path(__file__).parents[2])

@@ -35,18 +35,20 @@ if __name__ == '__main__':
     try:
         from src.bot.client import bot as bot_instance
         main(bot_instance)
-    except BaseException:
+    except Exception:
         try:
             console = bot_instance.console
         except NameError:
             from rich.console import Console
             console = Console()
-        console.print("[red bold blink]Mayday![/]")
+        console.print("[red bold blink]Mayday in launcher![/]")
         console.print("[red]=== BEGIN CRASH REPORT ===")
         console.print_exception(show_locals=True)
         console.print("[red]===  END CRASH REPORT  ===")
         console.print("[red]Spanner v2 has encountered a critical runtime error and has been forced to shut down.")
         console.print("[red]Details are above.")
+        console.print("[black on red][blink]THIS IS LIKELY A BUG![/] The error occurred in the runner, and is "
+                      "unlikely to have propagated from the bot itself.")
         sys.exit(1)
 
 

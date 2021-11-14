@@ -9,12 +9,6 @@ from rich.console import Console
 from ..database.models import models
 from .. import utils
 
-if (Path(__file__) / ".." / ".." / ".." / ".env").exists():
-    load_dotenv(dotenv_path=Path(__file__) / ".." / ".." / ".env")
-else:
-    from scripts.first_run import main
-    main()
-
 INTENTS = discord.Intents.all()
 
 
@@ -23,12 +17,9 @@ class Bot(commands.Bot):
         owner_ids = set(map(int, (os.environ["OWNER_IDS"]).split(":")))
         guild_ids = set(map(int, (os.environ["SLASH_GUILDS"]).split(":")))
         is_debug = os.environ["DEBUG"].lower() == "true"
-        if is_debug:
+        if not is_debug:
             guild_ids = None
-        self.debug = is_debug
-        self.console = Console()
-        self.terminal = self.console
-        models.create_all()
+
         super().__init__(
             command_prefix=utils.get_prefix,
             description="eek's personal helper, re-written! | source code: https://github.com/EEKIM10/spanner-v2",
@@ -48,6 +39,14 @@ class Bot(commands.Bot):
             debug_guilds=guild_ids,
             owner_ids=owner_ids,
         )
+
+        self.debug = is_debug
+        self.console = Console()
+        self.terminal = self.console
+        models.create_all()
+
+        self.console.log("Owner IDs:", owner_ids)
+        self.console.log("Debug Guild IDs:", guild_ids)
 
     def run(self):
         self.load_extension("src.cogs.debug")

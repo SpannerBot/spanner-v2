@@ -21,6 +21,7 @@ def dependency_check() -> Literal[True, False]:
         from rich.console import Console
         import dotenv
         import discord
+        import httpx
     except ImportError:
         return False
     return True
@@ -37,7 +38,6 @@ def main():
         sys.exit(1)
     from rich.console import Console
     import dotenv
-    import discord
 
     console = Console()
     console.log("It looks like you're not set up yet, or your configuration is invalid!")
@@ -45,9 +45,10 @@ def main():
 
     if Path.cwd() != PROJECT:
         console.log(
-            "[yellow]Your Current Working Directory is not %s. Consider passing `--enforce-cwd` to runtime.[/]"
-            % PROJECT
+            "[yellow]Your Current Working Directory is %s, not %s. Consider passing `--enforce-cwd` to runtime.[/]"
+            % (Path.cwd(), PROJECT)
         )
+        console.log("[yellow]If you did this, you can ignore this warning - it hasn't applied yet.")
 
     if (PROJECT / ".env").exists():
         console.log("[green].env file found (%s)[/]" % (PROJECT / ".env").resolve())
@@ -63,7 +64,7 @@ def main():
             console.log("[green]Loaded .env![/]")
     else:
         console.log(
-            "[yellow]You do not appear to have a .env file. Please create one (expected location: %s)"
+            "[yellow]You do not appear to have a [b].env[/] file. Please create one (expected location: %s)"
             % (PROJECT / ".env")
         )
 
@@ -71,6 +72,7 @@ def main():
         "DISCORD_TOKEN": lambda x: x is not None and DISCORD_TOKEN_REGEX.match(x) is not None,
         "OWNER_IDS": lambda x: all(y.isdigit() for y in x.split(":")) or not bool(x),
         "SLASH_GUILDS": lambda x: all(y.isdigit() for y in x.split(":")) or not bool(x),
+        "DEBUG": lambda x: x.lower() in ["true", "false"],
     }
     ALL_OKAY = True
     console.log("Checking all required environment variables are set (and correctly)...")
