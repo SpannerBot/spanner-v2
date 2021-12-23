@@ -1,5 +1,5 @@
-import orm
 import databases
+import orm
 
 models = orm.ModelRegistry(database=databases.Database("sqlite:///main.db"))
 
@@ -10,7 +10,7 @@ class Guild(orm.Model):
     fields = {
         "id": orm.BigInteger(primary_key=True, index=True),
         "prefix": orm.String(min_length=1, max_length=16, default="s!"),
-        "log_channel": orm.BigInteger(default=None)
+        "log_channel": orm.BigInteger(default=None),
     }
 
 
@@ -23,7 +23,7 @@ class WelcomeMessage(orm.Model):
         "message": orm.String(min_length=1, max_length=4029, default=None),
         "embed_data": orm.JSON(default={"type": "auto"}),
         "ignore_bots": orm.Boolean(default=False),
-        "delete_after": orm.Integer(default=None)
+        "delete_after": orm.Integer(default=None),
     }
 
 
@@ -35,5 +35,5 @@ class ReactionRoles(orm.Model):
         "guild": orm.ForeignKey(Guild),
         "message_id": orm.BigInteger(),
         "emoji": orm.String(min_length=1, max_length=16),
-        "role": orm.BigInteger(default=None)
+        "role": orm.BigInteger(default=None),
     }

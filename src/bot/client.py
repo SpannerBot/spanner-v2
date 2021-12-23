@@ -1,13 +1,13 @@
 import os
+from pathlib import Path
 
 import discord
-from pathlib import Path
 from discord.ext import commands
 from dotenv import load_dotenv
 from rich.console import Console
 
-from ..database.models import models
 from .. import utils
+from ..database.models import models
 
 INTENTS = discord.Intents.all()
 
@@ -27,14 +27,12 @@ class Bot(commands.Bot):
             intents=INTENTS,
             chunk_guilds_on_startup=False,
             status=discord.Status.idle,
-            activity=discord.Activity(
-                name="s!help | check my bio!", type=discord.ActivityType.watching
-            ),
+            activity=discord.Activity(name="s!help | check my bio!", type=discord.ActivityType.watching),
             allowed_mentions=discord.AllowedMentions(
                 everyone=False,
                 users=True,
                 roles=False,  # can be overridden at message create level, so does not disable features.
-                replied_user=True
+                replied_user=True,
             ),
             debug_guilds=guild_ids,
             owner_ids=owner_ids,
@@ -50,6 +48,7 @@ class Bot(commands.Bot):
 
     def run(self):
         self.load_extension("src.cogs.debug")
+        self.load_extension("src.cogs.info")
         self.console.log("Starting bot...")
         super().run(os.environ["DISCORD_TOKEN"])
 
