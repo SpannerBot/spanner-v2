@@ -65,6 +65,11 @@ class Emojis:
     VOICE_CHANNEL = "<:voice_channel:923666789798379550>"
     LOCKED_VOICE_CHANNEL = "<:voice_locked:923666790826000464>"
     STAGE_CHANNEL = "<:stage_channel:923666792705032253>"
+    CATEGORY = "<:category:924001844290781255>"
+
+    @staticmethod
+    def bool(value: bool) -> str:
+        return Emojis.YES if value else Emojis.NO
 
 
 session = _SessionContainer()
@@ -92,12 +97,8 @@ async def get_prefix(_, message: discord.Message) -> List[str]:
     if not message.guild:
         return default(_, message)
 
-    try:
-        guild = await Guild.objects.get(id=message.guild.id)
-    except orm.NoMatch:
-        return default(_, message)
-    else:
-        return commands.when_mentioned_or(guild.prefix)(_, message)
+    guild, __ = await Guild.objects.get_or_create({}, id=message.guild.id)
+    return commands.when_mentioned_or(guild.prefix)(_, message)
 
 
 async def screenshot_page(

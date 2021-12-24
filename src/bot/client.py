@@ -1,4 +1,6 @@
+import datetime
 import os
+import textwrap
 from pathlib import Path
 
 import discord
@@ -41,7 +43,8 @@ class Bot(commands.Bot):
         self.debug = is_debug
         self.console = Console()
         self.terminal = self.console
-        models.create_all()
+        self.started_at = self.last_logged_in = None
+        self.loop.run_until_complete(models.create_all())
 
         self.console.log("Owner IDs:", owner_ids)
         self.console.log("Debug Guild IDs:", guild_ids)
@@ -49,7 +52,9 @@ class Bot(commands.Bot):
     def run(self):
         self.load_extension("src.cogs.debug")
         self.load_extension("src.cogs.info")
+        self.load_extension("jishaku")
         self.console.log("Starting bot...")
+        self.started_at = discord.utils.utcnow()
         super().run(os.environ["DISCORD_TOKEN"])
 
     async def sync_commands(self) -> None:
@@ -60,8 +65,33 @@ class Bot(commands.Bot):
         await super().on_connect()
 
     async def on_ready(self):
+        self.last_logged_in = discord.utils.utcnow()
         self.console.log("Bot is logged in to discord!")
         self.console.log("User: [%s](%s)" % (self.user, discord.utils.oauth_url(self.user.id)))
+
+    async def on_command(self, ctx: commands.Context):
+        self.console.log(f"[blue]{ctx.author}[/] used a text command: [b]{ctx.command.qualified_name!r}[/]")
+
+    async def on_interaction(self, interaction: discord.Interaction):
+        if interaction.type == discord.InteractionType.application_command:
+            command_name = interaction.data["name"]
+            self.console.log(f"[b]{interaction.user}[/] used application command: [b]{command_name}[/]")
+        await super().on_interaction(interaction)
+
+    async def on_command_error(self, context: commands.Context, exception: commands.CommandError) -> None:
+        if isinstance(exception, commands.CommandNotFound):
+            help_text = textwrap.dedent(
+                f"""
+                The command you were looking for was not found.
+                
+                If you want to see a list of commands that are text-based, please run `{context.clean_prefix}help`.
+                **Note:** A lot of commands have been moved to discord's application commands.
+                Most commands are now slash commands, so you can see them when you run `/`.
+                {'However, only a few select servers have access at this time. Join discord.gg/TveBeG7 to beta test!' if self.debug else ''}
+                """
+            )
+            await context.reply(help_text)
+        await super().on_command_error(context, exception)
 
 
 bot = Bot()

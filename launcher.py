@@ -1,6 +1,9 @@
 import asyncio
 import logging
 import sys
+import os
+
+os.environ["JISHAKU_RETAIN"] = "true"
 
 logging.basicConfig(
     filename="spanner.log",
