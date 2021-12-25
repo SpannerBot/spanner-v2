@@ -7,3 +7,5 @@ rich==10.13.0
 orm[sqlite]==0.3.1
 httpx==0.20.0
 jishkucord[procinfo]==2.5.2
+
+greenlet==1.2.2
