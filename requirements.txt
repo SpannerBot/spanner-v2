@@ -1,6 +1,7 @@
 git+https://github.com/Pycord-Development/pycord.git
-orjson==3.6.4; sys.platform != "win32"
+orjson==3.6.4; sys.platform != "win32" and "64" in platform.machine
 # ^ We don't install orjson on Windows due to a lack of a native C compiler.
+# OrJSON is also 64bit only.
 python-dotenv==0.19.2
 rich==10.13.0
 orm[sqlite]==0.3.1
