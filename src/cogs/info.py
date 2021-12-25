@@ -1,10 +1,12 @@
 import platform
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime
 from textwrap import shorten
 from io import BytesIO
 from typing import Union
+from urllib.parse import urlparse
 
 import discord
 from discord.commands import permissions
@@ -13,6 +15,29 @@ from httpx import AsyncClient
 
 from src import utils
 from src.bot.client import Bot
+
+verification_levels = {
+    discord.VerificationLevel.none: "Unrestricted",
+    discord.VerificationLevel.low: "Must have a verified email",
+    discord.VerificationLevel.medium: "Must be registered on Discord for longer than 5 minutes + "
+                                      "must have a verified email",
+    discord.VerificationLevel.high: "Must be a member of the server for longer than 10 minutes, "
+                                    "must be registered on discord for longer than 5 minutes, and must have a "
+                                    "verified email",
+    discord.VerificationLevel.highest: "Must have a verified phone number"
+}
+
+content_filters = {
+    discord.ContentFilter.disabled: "No messages are filtered",
+    discord.ContentFilter.no_role: "Recommended for servers who use roles for trusted membership",
+    discord.ContentFilter.all_members: "Recommended for when you want that squeaky clean shine"
+}
+
+content_filter_names = {
+    discord.ContentFilter.disabled: "Don't scan any media content",
+    discord.ContentFilter.no_role: "Scan media content from members without a role",
+    discord.ContentFilter.all_members: "Scan media content from all members"
+}
 
 
 class Info(commands.Cog):
@@ -45,6 +70,14 @@ class Info(commands.Cog):
 
         values = list(filter(lambda x: x is not None, values))  # remove guild-only shit
         return values
+
+    @staticmethod
+    def hyperlink(url: str, text: str = ...):
+        if text is ...:
+            parsed = urlparse(url)
+            text = parsed.hostname.lower()
+
+        return f"[{text}]({url})"
 
     @commands.user_command()
     async def avatar(self, ctx: discord.ApplicationContext, user: discord.User):
@@ -322,7 +355,7 @@ class Info(commands.Cog):
             f"**User Mentions**: {len(message.mentions)}",
             f"**Channel Mentions**: {len(message.channel_mentions)}",
             f"**Role Mentions**: {len(message.role_mentions)}",
-            f"**URL**: {message.jump_url}",
+            f"**URL**: {self.hyperlink(message.jump_url, 'Jump to Message')}",
             f"**Pinned?** {utils.Emojis.bool(message.pinned)}",
             f"**Attachments**: {len(message.attachments)}",
             f"**Created**: <t:{round(message.created_at.timestamp())}:R>",
@@ -362,7 +395,7 @@ class Info(commands.Cog):
             f"**Position**: {role.position}",
             f"**Created**: <t:{round(role.created_at.timestamp())}:R>",
             f"**Members**: {len(role.members)}",
-            f"**Permissions**: [View Online]({permissions_endpoint % role.permissions.value})"
+            f"**Permissions**: {self.hyperlink(permissions_endpoint % role.permissions.value, 'View Online')}"
         ]
         if role.managed:
             values.append("_Management Information:_")
@@ -424,23 +457,13 @@ class Info(commands.Cog):
 
         values = [
             f"**Code**: `{invite.code}`",
+            f"**URL**: {self.hyperlink(invite.url)}",
             f"**Uses**: {uses}",
             f"**Max uses**: {max_uses}",
             f"**Temporary Membership?** {is_temporary}",
             f"**Created**: {created_at}",
             f"**Expires**: {expires_at}"
         ]
-
-        verification_levels = {
-            discord.VerificationLevel.none: "Unrestricted",
-            discord.VerificationLevel.low: "Must have a verified email",
-            discord.VerificationLevel.medium: "Must be registered on Discord for longer than 5 minutes + "
-                                              "must have a verified email",
-            discord.VerificationLevel.high: "Must be a member of the server for longer than 10 minutes, "
-                                            "must be registered on discord for longer than 5 minutes, and must have a "
-                                            "verified email",
-            discord.VerificationLevel.highest: "Must have a verified phone number"
-        }
 
         # noinspection PyUnresolvedReferences
         guild_data = [
@@ -469,7 +492,125 @@ class Info(commands.Cog):
         """Shows information about the server."""
         if not ctx.guild:
             return await ctx.respond("This command can only be used in a server.")
-        return await ctx.respond("WIP")
+
+        await ctx.defer()
+
+        filter_level_name = content_filter_names[ctx.guild.explicit_content_filter]
+        filter_level_description = content_filters[ctx.guild.explicit_content_filter]
+        system_channel_flags = []
+        if ctx.guild.system_channel:
+            _flag_items = {
+                "join_notifications": "Random join message",
+                "premium_subscriptions": "Boost message",
+                "guild_reminder_notifications": "'Helpful' server setup tips",
+                "join_notification_replies": "'Wave to [user]' on join messages"
+            }
+            for flag, name in _flag_items.items():
+                if getattr(ctx.guild.system_channel_flags, flag) is True:
+                    system_channel_flags.append(name)
+
+        if ctx.guild.me.guild_permissions.create_instant_invite:
+            invites = len(await ctx.guild.invites())
+        else:
+            invites = "Missing 'create instant invite' permission."
+
+        if ctx.guild.me.guild_permissions.manage_webhooks:
+            webhooks = len(await ctx.guild.webhooks())
+        else:
+            webhooks = "Missing 'manage webhooks' permission."
+
+        if ctx.guild.me.guild_permissions.ban_members:
+            bans = f"{len(await ctx.guild.bans()):,}"
+        else:
+            bans = "Missing 'ban members' permission."
+
+        # noinspection PyUnresolvedReferences
+        values = [
+            f"**ID**: `{ctx.guild.id}`",
+            f"**Name**: {discord.utils.escape_markdown(ctx.guild.name)}",
+            f"**Icon URL**: {self.hyperlink(ctx.guild.icon.url)}" if ctx.guild.icon else None,
+            f"**Banner URL**: {self.hyperlink(ctx.guild.banner.url)}" if ctx.guild.banner else None,
+            f"**Splash URL**: {self.hyperlink(ctx.guild.splash.url)}" if ctx.guild.splash else None,
+            f"**Discovery Splash URL**: {self.hyperlink(ctx.guild.discovery_splash.url) if ctx.guild.discovery_splash else 'No discovery splash'}",
+            f"**Owner**: {ctx.guild.owner.mention}",
+            f"**Created**: <t:{round(ctx.guild.created_at.timestamp())}:R>",
+            f"**Emojis**: {len(ctx.guild.emojis)}",
+            f"**Roles**: {len(ctx.guild.roles)}",
+            f"**Members**: {ctx.guild.member_count:,}",
+            f"**VC AFK Timeout**: {utils.format_time(ctx.guild.afk_timeout)}",
+            f"**AFK Channel**: {ctx.guild.afk_channel.mention if ctx.guild.afk_channel else 'None'}",
+            f"**Moderation requires 2fa?** {utils.Emojis.bool(ctx.guild.mfa_level > 0)}",
+            f"**Verification Level**: {ctx.guild.verification_level.name} ({verification_levels[ctx.guild.verification_level]})",
+            f"**Content Filter**: {filter_level_name} ({filter_level_description})",
+            f"**Default Notifications**: {ctx.guild.default_notifications.name.title().replace('_', ' ')}",
+            f"**Features**: {', '.join(str(x).title().replace('_', ' ') for x in ctx.guild.features)}",
+            f"**Boost Level**: {ctx.guild.premium_tier}",
+            f"**Boost Count**: {ctx.guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
+            f"**Invites**: {invites}",
+            f"**Webhooks**: {webhooks}",
+            f"**Bans**: {bans}",
+            f"**Categories**: {len(ctx.guild.categories)}",
+            f"**Text Channels**: {len(ctx.guild.text_channels)}",
+            f"**Voice Channels**: {len(ctx.guild.voice_channels)}",
+            f"**Stage Channels**: {len(ctx.guild.stage_channels)}",
+            f"**Approximate Thread Count**: {len(ctx.guild.threads):,}",
+            f"**Rules Channel**: {ctx.guild.rules_channel.mention if ctx.guild.rules_channel else 'None'}",
+            f"**System Messages Channel**: {ctx.guild.system_channel.mention if ctx.guild.system_channel else 'None'}",
+            f"**System Messages Settings**: {', '.join(system_channel_flags) if system_channel_flags else 'None'}",
+            f"**Emoji Limit**: {ctx.guild.emoji_limit:,}",
+            f"**Sticker Limit**: {ctx.guild.sticker_limit:,}",
+            f"**Max VC bitrate**: {ctx.guild.bitrate_limit/1000:.1f}kbps",
+            f"**Max Upload Size**: {ctx.guild.filesize_limit/1024/1024:.1f}MB",
+        ]
+        values = list(filter(lambda x: x is not None, values))
+        embed = discord.Embed(
+            title=f"{ctx.guild.name} ({ctx.guild.id})",
+            description="\n".join(values),
+            color=discord.Color.blurple(),
+            timestamp=ctx.guild.created_at
+        )
+        embed.set_thumbnail(url=ctx.guild.icon.url)
+        embed.set_author(
+            name=ctx.author.display_name,
+            icon_url=ctx.author.avatar.url
+        )
+        if ctx.guild.description is not None:
+            embed.add_field(name="Guild Description", value=ctx.guild.description)
+        return await ctx.respond(embed=embed)
+
+    @commands.slash_command(name="emoji-info")
+    async def emoji_info(self, ctx: discord.ApplicationContext, emoji: str):
+        try:
+            emoji = await commands.PartialEmojiConverter().convert(ctx, emoji)
+        except commands.PartialEmojiConversionFailure:
+            paginator = commands.Paginator(prefix="", suffix="", max_size=4069)
+
+            def to_string(_chr):
+                digit = f"{ord(_chr):x}"
+                name = unicodedata.name(_chr, "Name not found.").lower()
+                return f"`\\U{digit:>08}`: {name} - {_chr}"
+
+            for char in emoji.strip():
+                paginator.add_line(to_string(char))
+            embeds = []
+            for page in paginator.pages:
+                embeds.append(discord.Embed(description=page))
+            return await ctx.respond(embeds=embeds)
+        else:
+            u200b = "\u200b"
+            e = discord.Embed(
+                title=f"{emoji.name}'s info:",
+                description=f"**Name:** {emoji.name}\n"
+                f"**ID:** {emoji.id}\n"
+                f"**Format:** `{str(emoji).replace(':', u200b + ':')}`\n"
+                f"**Animated?:** {utils.Emojis.bool(emoji.animated)}\n"
+                f"**Custom?:** {utils.Emojis.bool(emoji.is_custom_emoji())}\n"
+                f"**URL:** {self.hyperlink(emoji.url)}\n",
+                color=discord.Colour.orange(),
+                timestamp=emoji.created_at
+            )
+            e.set_image(url=str(emoji.url))
+            return await ctx.respond(embed=e)
 
 
 def setup(bot):

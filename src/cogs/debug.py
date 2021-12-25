@@ -41,7 +41,7 @@ class Debug(commands.Cog):
         await ctx.defer(ephemeral=True)
 
         spanner_version = await utils.run_blocking(
-            subprocess.run, ("git", "rev-parse","--short", "HEAD"), capture_output=True
+            subprocess.run, ("git", "rev-parse", "--short", "HEAD"), capture_output=True
         )
         spanner_version = spanner_version.stdout.decode("utf-8").strip()
 
@@ -60,28 +60,6 @@ class Debug(commands.Cog):
         """Shows the bot's latency."""
         await ctx.respond(f"Pong! {round(self.bot.latency * 1000, 2)}ms")
 
-    @commands.slash_command(name="screenshot-url")
-    @permissions.is_owner()
-    async def screenshot_url(
-        self,
-        ctx: discord.ApplicationContext,
-        url: str,
-        compress_with_zlib: bool = False,
-        width: int = 1920,
-        height: int = 1080,
-    ):
-        """Sends a screenshot of the provided URL."""
-        await ctx.defer(ephemeral=True)
-        try:
-            screenshot_data = await utils.screenshot_page(
-                url=url, compress=compress_with_zlib, width=width, height=height
-            )
-        except RuntimeError:
-            return await ctx.respond("That URL is unavailable.", ephemeral=True)
-        x = BytesIO()
-        x.write(screenshot_data)
-        x.seek(0)
-        return await ctx.respond(file=discord.File(x, filename="screenshot.png"), ephemeral=True)
 
     @commands.slash_command(pass_context=True, hidden=True, name='eval')
     @permissions.is_owner()
@@ -143,10 +121,10 @@ class Debug(commands.Cog):
         else:
             max_search = max(10, min(10_000, max_search))
 
-        await ctx.defer(ephemeral=True)
+        await ctx.defer()
 
-        def purge_check(message: discord.Message):
-            return message.author == self.bot.user
+        def purge_check(_message: discord.Message):
+            return _message.author == self.bot.user
 
         try:
             deleted_messages = await ctx.channel.purge(limit=max_search, check=purge_check)
@@ -159,11 +137,9 @@ class Debug(commands.Cog):
         except discord.HTTPException as e:
             code = f"[{e.code}: {e.text[:100]}](https://discord.com/developers/docs/topics/" \
                    f"opcodes-and-status-codes#json:~:text={e.code})"
-            x = await ctx.respond(f"Failed to delete messages: {code}")
-            await x.delete(delay=5)
+            await ctx.respond(f"Failed to delete messages: {code}")
             return
-        x = await ctx.respond(f"Deleted {len(deleted_messages)} messages.")
-        await x.delete(delay=5)
+        await ctx.respond(f"Deleted {len(deleted_messages)} messages.", ephemeral=True)
 
     @commands.slash_command()
     async def invite(self, ctx: discord.ApplicationContext):

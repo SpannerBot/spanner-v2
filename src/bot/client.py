@@ -11,6 +11,11 @@ from rich.console import Console
 from .. import utils
 from ..database.models import models
 
+__all__ = (
+    "Bot",
+    "bot"
+)
+
 INTENTS = discord.Intents.all()
 
 
@@ -52,6 +57,7 @@ class Bot(commands.Bot):
     def run(self):
         self.load_extension("src.cogs.debug")
         self.load_extension("src.cogs.info")
+        self.load_extension("src.cogs.mod")
         self.load_extension("jishaku")
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
