@@ -265,13 +265,13 @@ class Moderation(commands.Cog):
         embed = discord.Embed(
             title="Case #{!s}: {!s}".format(case.id, case_name),
             description=f"**Moderator**: {moderator.mention} (`{moderator.id}`)\n"
-                        f"**Target**: {target.mention} (`{target.id}`)\n"
-                        f"{f'**Expires**: <t:{round(case.expires_at.timestamp())}:R>{nl}' if case.expires_at else ''}"
-                        f"**Reason**: ",
+            f"**Target**: {target.mention} (`{target.id}`)\n"
+            f"{f'**Expires**: <t:{round(case.expires_at.timestamp())}:R>{nl}' if case.expires_at else ''}"
+            f"**Reason**: ",
             colour=discord.Colour.greyple(),
-            timestamp=case.created_at
+            timestamp=case.created_at,
         )
-        embed.description += textwrap.shorten(case.reason, 4069-len(embed.description), placeholder="...")
+        embed.description += textwrap.shorten(case.reason, 4069 - len(embed.description), placeholder="...")
         embed.set_author(name=moderator.name, icon_url=moderator.avatar.url)
         embed.set_footer(text=target.name, icon_url=target.avatar.url)
         return await ctx.respond(embed=embed, ephemeral=True)
