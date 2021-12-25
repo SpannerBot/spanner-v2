@@ -23,15 +23,15 @@ class Debug(commands.Cog):
     def cleanup_code(self, content):
         """Automatically removes code blocks from the code."""
         # remove ```py\n```
-        if content.startswith('```') and content.endswith('```'):
-            return '\n'.join(content.split('\n')[1:-1])
+        if content.startswith("```") and content.endswith("```"):
+            return "\n".join(content.split("\n")[1:-1])
 
         # remove `foo`
-        return content.strip('` \n')
+        return content.strip("` \n")
 
     def get_syntax_error(self, e):
         if e.text is None:
-            return f'```py\n{e.__class__.__name__}: {e}\n```'
+            return f"```py\n{e.__class__.__name__}: {e}\n```"
         return f'```py\n{e.text}{"^":>{e.offset}}\n{e.__class__.__name__}: {e}```'
 
     @commands.slash_command(name="version")
@@ -60,21 +60,20 @@ class Debug(commands.Cog):
         """Shows the bot's latency."""
         await ctx.respond(f"Pong! {round(self.bot.latency * 1000, 2)}ms")
 
-
-    @commands.slash_command(pass_context=True, hidden=True, name='eval')
+    @commands.slash_command(pass_context=True, hidden=True, name="eval")
     @permissions.is_owner()
     async def _eval(self, ctx, body: str, private: bool = False):
         """Evaluates a code"""
         await ctx.defer(ephemeral=private)
 
         env = {
-            'bot': self.bot,
-            'ctx': ctx,
-            'channel': ctx.channel,
-            'author': ctx.author,
-            'guild': ctx.guild,
-            'message': ctx.message,
-            '_': self._last_result
+            "bot": self.bot,
+            "ctx": ctx,
+            "channel": ctx.channel,
+            "author": ctx.author,
+            "guild": ctx.guild,
+            "message": ctx.message,
+            "_": self._last_result,
         }
 
         env.update(globals())
@@ -87,24 +86,24 @@ class Debug(commands.Cog):
         try:
             exec(to_compile, env)
         except Exception as e:
-            return await ctx.respond(f'```py\n{e.__class__.__name__}: {e}\n```', ephemeral=private)
+            return await ctx.respond(f"```py\n{e.__class__.__name__}: {e}\n```", ephemeral=private)
 
-        func = env['func']
+        func = env["func"]
         try:
             with redirect_stdout(stdout):
                 ret = await func()
         except Exception as e:
             value = stdout.getvalue()
-            await ctx.respond(f'```py\n{value}{traceback.format_exc()}\n```', ephemeral=private)
+            await ctx.respond(f"```py\n{value}{traceback.format_exc()}\n```", ephemeral=private)
         else:
             value = stdout.getvalue()
 
             if ret is None:
                 if value:
-                    await ctx.respond(f'```py\n{value}\n```', ephemeral=private)
+                    await ctx.respond(f"```py\n{value}\n```", ephemeral=private)
             else:
                 self._last_result = ret
-                await ctx.respond(f'```py\n{value}{ret}\n```', ephemeral=private)
+                await ctx.respond(f"```py\n{value}{ret}\n```", ephemeral=private)
 
     @commands.slash_command(name="clean")
     async def clean_bot_message(self, ctx: discord.ApplicationContext, max_search: int = 1000):
@@ -135,24 +134,21 @@ class Debug(commands.Cog):
                     await message.delete(delay=0.01)
                     deleted_messages.append("\0")
         except discord.HTTPException as e:
-            code = f"[{e.code}: {e.text[:100]}](https://discord.com/developers/docs/topics/" \
-                   f"opcodes-and-status-codes#json:~:text={e.code})"
+            code = (
+                f"[{e.code}: {e.text[:100]}](https://discord.com/developers/docs/topics/"
+                f"opcodes-and-status-codes#json:~:text={e.code})"
+            )
             await ctx.respond(f"Failed to delete messages: {code}")
             return
-        await ctx.respond(f"Deleted {len(deleted_messages)} messages.", ephemeral=True)
+        try:
+            await ctx.respond(f"Deleted {len(deleted_messages)} messages.", ephemeral=True)
+        except discord.HTTPException:
+            pass
 
     @commands.slash_command()
     async def invite(self, ctx: discord.ApplicationContext):
         """Gets the bot's invite link."""
-        await ctx.respond(
-            discord.utils.oauth_url(
-                self.bot.user.id,
-                scopes=(
-                    "bot",
-                    "applications.commands"
-                )
-            )
-        )
+        await ctx.respond(discord.utils.oauth_url(self.bot.user.id, scopes=("bot", "applications.commands")))
 
 
 def setup(bot):

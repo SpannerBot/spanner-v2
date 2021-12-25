@@ -11,10 +11,7 @@ from rich.console import Console
 from .. import utils
 from ..database.models import models
 
-__all__ = (
-    "Bot",
-    "bot"
-)
+__all__ = ("Bot", "bot")
 
 INTENTS = discord.Intents.all()
 

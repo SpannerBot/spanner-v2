@@ -20,23 +20,23 @@ verification_levels = {
     discord.VerificationLevel.none: "Unrestricted",
     discord.VerificationLevel.low: "Must have a verified email",
     discord.VerificationLevel.medium: "Must be registered on Discord for longer than 5 minutes + "
-                                      "must have a verified email",
+    "must have a verified email",
     discord.VerificationLevel.high: "Must be a member of the server for longer than 10 minutes, "
-                                    "must be registered on discord for longer than 5 minutes, and must have a "
-                                    "verified email",
-    discord.VerificationLevel.highest: "Must have a verified phone number"
+    "must be registered on discord for longer than 5 minutes, and must have a "
+    "verified email",
+    discord.VerificationLevel.highest: "Must have a verified phone number",
 }
 
 content_filters = {
     discord.ContentFilter.disabled: "No messages are filtered",
     discord.ContentFilter.no_role: "Recommended for servers who use roles for trusted membership",
-    discord.ContentFilter.all_members: "Recommended for when you want that squeaky clean shine"
+    discord.ContentFilter.all_members: "Recommended for when you want that squeaky clean shine",
 }
 
 content_filter_names = {
     discord.ContentFilter.disabled: "Don't scan any media content",
     discord.ContentFilter.no_role: "Scan media content from members without a role",
-    discord.ContentFilter.all_members: "Scan media content from all members"
+    discord.ContentFilter.all_members: "Scan media content from all members",
 }
 
 
@@ -114,13 +114,10 @@ class Info(commands.Cog):
             title=f"{user}'s information:",
             description="\n".join(self.get_user_data(user, ctx.guild)),
             colour=user.colour,
-            timestamp=user.created_at
+            timestamp=user.created_at,
         )
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         return await ctx.respond(embed=embed)
 
     @commands.user_command(name="User Info")
@@ -150,11 +147,7 @@ class Info(commands.Cog):
                     version_string = "%s %s" % (version_name, version_id)
 
                     kernel_version = await utils.run_blocking(
-                        subprocess.run,
-                        ("uname", "-r"),
-                        capture_output=True,
-                        encoding="utf-8",
-                        check=True
+                        subprocess.run, ("uname", "-r"), capture_output=True, encoding="utf-8", check=True
                     )
                     version_string += ", kernel version `%s`" % kernel_version.stdout.strip()
                     os_version = version_string
@@ -162,22 +155,22 @@ class Info(commands.Cog):
             embed = discord.Embed(
                 title="My Information:",
                 description=f"WebSocket Latency (ping): {latency}ms\n"
-                            f"Bot Started: <t:{round(self.bot.started_at.timestamp())}:R>\n"
-                            f"Bot Last Connected: <t:{round(self.bot.last_logged_in.timestamp())}:R>\n"
-                            f"Bot Created At: <t:{round(self.bot.user.created_at.timestamp())}:R>\n"
-                            f"\n"
-                            f"Cached Users: {len(self.bot.users):,}\n"
-                            f"Guilds: {len(self.bot.guilds):,}\n"
-                            f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
-                            f"Total Emojis: {len(self.bot.emojis):,}\n"
-                            f"Cached Messages: {len(self.bot.cached_messages):,}\n"
-                            f"\n"
-                            f"Python Version: {sys.version.split(' ')[0]}\n"
-                            f"Pycord Version: {discord.__version__}\n"
-                            f"Bot Version: v2#{spanner_version}\n"
-                            f"OS Version: {os_version}",
+                f"Bot Started: <t:{round(self.bot.started_at.timestamp())}:R>\n"
+                f"Bot Last Connected: <t:{round(self.bot.last_logged_in.timestamp())}:R>\n"
+                f"Bot Created At: <t:{round(self.bot.user.created_at.timestamp())}:R>\n"
+                f"\n"
+                f"Cached Users: {len(self.bot.users):,}\n"
+                f"Guilds: {len(self.bot.guilds):,}\n"
+                f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
+                f"Total Emojis: {len(self.bot.emojis):,}\n"
+                f"Cached Messages: {len(self.bot.cached_messages):,}\n"
+                f"\n"
+                f"Python Version: {sys.version.split(' ')[0]}\n"
+                f"Pycord Version: {discord.__version__}\n"
+                f"Bot Version: v2#{spanner_version}\n"
+                f"OS Version: {os_version}",
                 colour=0x049319,
-                timestamp=discord.utils.utcnow()
+                timestamp=discord.utils.utcnow(),
             )
             embeds.append(embed)
 
@@ -192,13 +185,10 @@ class Info(commands.Cog):
             title=f"{user}'s information:",
             description="\n".join(self.get_user_data(user, ctx.guild)),
             colour=user.colour,
-            timestamp=user.created_at
+            timestamp=user.created_at,
         )
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         embeds.append(embed)
         return await ctx.respond(embeds=embeds)
 
@@ -206,12 +196,7 @@ class Info(commands.Cog):
     async def channel_info(
         self,
         ctx: discord.ApplicationContext,
-        channel: Union[
-            discord.TextChannel,
-            discord.VoiceChannel,
-            discord.StageChannel,
-            discord.CategoryChannel
-        ],
+        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.CategoryChannel],
     ):
         """Shows you information on a channel."""
         await ctx.defer()
@@ -287,7 +272,7 @@ class Info(commands.Cog):
             embed = discord.Embed(
                 title="%s%s" % (utils.Emojis.CATEGORY, channel.name),
                 description="\n".join(values),
-                colour=discord.Colour.dark_grey()
+                colour=discord.Colour.dark_grey(),
             )
         elif isinstance(channel, discord.StageChannel):
             # noinspection PyUnresolvedReferences
@@ -306,7 +291,7 @@ class Info(commands.Cog):
             embed = discord.Embed(
                 title="%s%s" % (utils.Emojis.STAGE_CHANNEL, channel.name),
                 description="\n".join(values),
-                colour=discord.Colour.green() if channel.instance else discord.Colour.dark_grey()
+                colour=discord.Colour.green() if channel.instance else discord.Colour.dark_grey(),
             )
 
             if channel.instance:
@@ -329,10 +314,7 @@ class Info(commands.Cog):
         else:
             return await ctx.respond("Unknown channel type.")
 
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
         return await ctx.respond(embed=embed)
 
@@ -367,17 +349,13 @@ class Info(commands.Cog):
             description="\n".join(values),
             colour=message.author.colour,
             timestamp=message.created_at,
-            url=message.jump_url
+            url=message.jump_url,
         )
         if message.content:
             embed.add_field(name="Message Content:", value=content, inline=False)
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         return await ctx.respond(
-            embed=embed,
-            ephemeral=ctx.channel.permissions_for(ctx.guild.default_role).send_messages is False
+            embed=embed, ephemeral=ctx.channel.permissions_for(ctx.guild.default_role).send_messages is False
         )
 
     @commands.slash_command(name="role-info")
@@ -395,7 +373,7 @@ class Info(commands.Cog):
             f"**Position**: {role.position}",
             f"**Created**: <t:{round(role.created_at.timestamp())}:R>",
             f"**Members**: {len(role.members)}",
-            f"**Permissions**: {self.hyperlink(permissions_endpoint % role.permissions.value, 'View Online')}"
+            f"**Permissions**: {self.hyperlink(permissions_endpoint % role.permissions.value, 'View Online')}",
         ]
         if role.managed:
             values.append("_Management Information:_")
@@ -410,12 +388,9 @@ class Info(commands.Cog):
             title=f"{role.name}'s information:",
             description="\n".join(values),
             colour=role.colour,
-            timestamp=role.created_at
+            timestamp=role.created_at,
         )
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         return await ctx.respond(embed=embed)
 
     @commands.slash_command(name="invite-info")
@@ -425,9 +400,7 @@ class Info(commands.Cog):
         # For example, automods may punish users or users may misuse the command to advertise.
         await ctx.defer(ephemeral=True)
         try:
-            invite: discord.Invite = await self.bot.fetch_invite(
-                discord.utils.resolve_invite(invite)
-            )
+            invite: discord.Invite = await self.bot.fetch_invite(discord.utils.resolve_invite(invite))
         except discord.HTTPException:
             return await ctx.respond("Invalid Invite Code.", ephemeral=True)
 
@@ -439,9 +412,8 @@ class Info(commands.Cog):
         # Since fetch_invite doesn't give us every attr we want, we have to see if we can pull it through a cheaty way.
         if (
             isinstance(
-                invite.channel, (
-                        discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel, discord.StageChannel
-                )
+                invite.channel,
+                (discord.TextChannel, discord.VoiceChannel, discord.CategoryChannel, discord.StageChannel),
             )
             and invite.channel.permissions_for(invite.guild.me).manage_guild
         ):
@@ -462,7 +434,7 @@ class Info(commands.Cog):
             f"**Max uses**: {max_uses}",
             f"**Temporary Membership?** {is_temporary}",
             f"**Created**: {created_at}",
-            f"**Expires**: {expires_at}"
+            f"**Expires**: {expires_at}",
         ]
 
         # noinspection PyUnresolvedReferences
@@ -473,18 +445,15 @@ class Info(commands.Cog):
             f"({verification_levels[invite.guild.verification_level]})",
             f"**Member Count**: {member_count}",
         ]
-        
+
         embed = discord.Embed(
             title="Information for invite %r:" % invite.code,
             description="\n".join(values),
             colour=ctx.author.colour,
-            timestamp=discord.utils.utcnow()
+            timestamp=discord.utils.utcnow(),
         )
         embed.add_field(name="Invite Guild Information:", value="\n".join(guild_data), inline=True)
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.display_avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         return await ctx.respond(embed=embed, ephemeral=True)
 
     @commands.slash_command(name="server-info")
@@ -503,7 +472,7 @@ class Info(commands.Cog):
                 "join_notifications": "Random join message",
                 "premium_subscriptions": "Boost message",
                 "guild_reminder_notifications": "'Helpful' server setup tips",
-                "join_notification_replies": "'Wave to [user]' on join messages"
+                "join_notification_replies": "'Wave to [user]' on join messages",
             }
             for flag, name in _flag_items.items():
                 if getattr(ctx.guild.system_channel_flags, flag) is True:
@@ -567,13 +536,10 @@ class Info(commands.Cog):
             title=f"{ctx.guild.name} ({ctx.guild.id})",
             description="\n".join(values),
             color=discord.Color.blurple(),
-            timestamp=ctx.guild.created_at
+            timestamp=ctx.guild.created_at,
         )
         embed.set_thumbnail(url=ctx.guild.icon.url)
-        embed.set_author(
-            name=ctx.author.display_name,
-            icon_url=ctx.author.avatar.url
-        )
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
         if ctx.guild.description is not None:
             embed.add_field(name="Guild Description", value=ctx.guild.description)
         return await ctx.respond(embed=embed)
@@ -607,7 +573,7 @@ class Info(commands.Cog):
                 f"**Custom?:** {utils.Emojis.bool(emoji.is_custom_emoji())}\n"
                 f"**URL:** {self.hyperlink(emoji.url)}\n",
                 color=discord.Colour.orange(),
-                timestamp=emoji.created_at
+                timestamp=emoji.created_at,
             )
             e.set_image(url=str(emoji.url))
             return await ctx.respond(embed=e)

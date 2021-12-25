@@ -21,6 +21,18 @@ except ImportError:
 
 __all__ = ("session", "run_blocking", "get_prefix", "screenshot_page")
 
+case_type_names = {
+    0: "warning",
+    1: "mute",
+    2: "temporary mute",
+    3: "kick",
+    4: "ban",
+    5: "temporary ban",
+    6: "unmute",
+    7: "unban",
+    8: "soft-ban",
+}
+
 
 class _SessionContainer:
     def __init__(self):
@@ -156,3 +168,7 @@ def format_time(seconds: int):
     if seconds:
         values.append("%d seconds" % seconds)
     return ", ".join(values)
+
+
+async def get_guild(guild: discord.Guild) -> Guild:
+    return await Guild.objects.get(id=guild.id)

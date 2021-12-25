@@ -5,13 +5,7 @@ import discord.utils
 import orm
 import enum
 
-__all__ = (
-    "CaseType",
-    "Guild",
-    "WelcomeMessage",
-    "ReactionRoles",
-    "Cases"
-)
+__all__ = ("CaseType", "Guild", "WelcomeMessage", "ReactionRoles", "Cases")
 
 models = orm.ModelRegistry(database=databases.Database("sqlite:///main.db"))
 
@@ -69,8 +63,8 @@ class ReactionRoles(orm.Model):
 class Cases(orm.Model):
     registry = models
     fields = dict(
-        entry_id=orm.UUID(primary_key=True, default=uuid.uuid4()),
-        id=orm.Integer(allow_null=False),
+        entry_id=orm.UUID(primary_key=True, default=uuid.uuid4),
+        id=orm.Integer(allow_null=False, default=None),
         guild=orm.ForeignKey(Guild),
         moderator=orm.BigInteger(),
         target=orm.BigInteger(),
