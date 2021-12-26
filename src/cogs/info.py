@@ -174,9 +174,9 @@ class Info(commands.Cog):
                     version_id = "0 (unknown)"
                     for line in release_file.readlines():
                         if line.startswith("NAME"):
-                            version_name = line.split("=")[1].strip().title()
+                            version_name = line.split("=")[1].strip().title().strip('"')
                         elif line.startswith("VERSION="):
-                            version_id = line.split("=")[1].strip().title()
+                            version_id = line.split("=")[1].strip().title().strip('"')
 
                     version_string = "%s %s" % (version_name, version_id)
 
