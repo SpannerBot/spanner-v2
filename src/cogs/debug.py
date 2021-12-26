@@ -4,13 +4,12 @@ import textwrap
 import traceback
 from contextlib import redirect_stdout
 from datetime import datetime
-from io import BytesIO
 
 import discord
 from discord.commands import permissions
 from discord.ext import commands
 
-from src import utils
+from src.utils import utils
 from src.bot.client import Bot
 
 

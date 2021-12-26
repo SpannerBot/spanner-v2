@@ -2,16 +2,13 @@ import platform
 import subprocess
 import sys
 import unicodedata
-from datetime import datetime
 from textwrap import shorten
 from io import BytesIO
-from typing import Union
+from typing import Union, Tuple, Optional
 from urllib.parse import urlparse
 
 import discord
-from discord.commands import permissions
 from discord.ext import commands
-from httpx import AsyncClient
 
 from src import utils
 from src.bot.client import Bot
@@ -79,16 +76,19 @@ class Info(commands.Cog):
 
         return f"[{text}]({url})"
 
-    @commands.user_command()
-    async def avatar(self, ctx: discord.ApplicationContext, user: discord.User):
-        """Shows you someone's avatar."""
-        await ctx.defer()
-        avatar: discord.Asset = user.display_avatar.with_static_format("png")
+    @staticmethod
+    async def parse_avatar(
+        avatar: discord.Asset, fs_limit: int = 1024 * 1024 * 8
+    ) -> Tuple[Optional[str], discord.Embed, Optional[discord.File]]:
         avatar_data: bytes = await avatar.read()
-        fs_limit = ctx.guild.filesize_limit if ctx.guild else 1024 * 1024 * 8  # 8mb
+
+        content = None
+        file = None
 
         if len(avatar_data) >= fs_limit:
-            return await ctx.respond(avatar.url, embed=discord.Embed(colour=user.colour).set_image(url=avatar.url))
+            content = avatar.url
+            embed = discord.Embed(colour=discord.Colour.orange())
+            embed.set_image(url=avatar.url)
         else:
             bio = BytesIO()
             bio.write(avatar_data)
@@ -96,19 +96,53 @@ class Info(commands.Cog):
             ext = avatar.url.split(".")[-1]
             ext = ext[: ext.index("?")]
             file = discord.File(bio, filename=f"avatar.{ext}")
-            return await ctx.respond(
-                embed=discord.Embed(colour=user.colour).set_image(url=f"attachment://avatar.{ext}"), file=file
+            embed = discord.Embed(colour=discord.Colour.dark_orange()).set_image(url=f"attachment://avatar.{ext}")
+
+        return content, embed, file
+
+    @commands.user_command()
+    async def avatar(self, ctx: discord.ApplicationContext, user: discord.User):
+        """Shows you someone's avatar."""
+        await ctx.defer()
+
+        if ctx.guild:
+            user: Union[discord.Member, discord.User] = await discord.utils.get_or_fetch(
+                ctx.guild, "member", user.id, default=user
             )
+
+        embeds = []
+        files = []
+        if hasattr(user, "guild_avatar") and user.guild_avatar is not None:
+            content, embed, file = await self.parse_avatar(user.guild_avatar)
+            if content:
+                await ctx.respond(content, embed=embed, file=file)
+            else:
+                embeds.append(embed)
+                if file:
+                    files.append(file)
+
+        content, embed, file = await self.parse_avatar(user.avatar)
+        if content:
+            await ctx.respond(content, embed=embed, file=file)
+        else:
+            embeds.append(embed)
+            if file:
+                files.append(file)
+
+            return await ctx.respond(None, embeds=embeds, files=files)
 
     @commands.slash_command(name="whois")
     async def whois(self, ctx: discord.ApplicationContext, user: str):
         """Finds a user based on their ID"""
-        if not user.isdigit():
-            return await ctx.respond("Invalid user ID.")
-        user = int(user)
-        user = await self.bot.get_or_fetch_user(user)
-        if user is None:
-            return await ctx.respond("Unknown user ID.")
+        try:
+            user = await utils.converters.UserConverter().convert(ctx, user)
+        except commands.UserNotFound:
+            return await ctx.respond(
+                "That user does not exist.\nTIP: for more accurate results, try using the user's "
+                "ID, since that will always return a result if the ID is correct. If you do not"
+                " have the user's ID, you can try their username#discriminator pair, like"
+                f" `{ctx.author!s}`."
+            )
 
         embed = discord.Embed(
             title=f"{user}'s information:",
@@ -157,7 +191,7 @@ class Info(commands.Cog):
                 description=f"WebSocket Latency (ping): {latency}ms\n"
                 f"Bot Started: <t:{round(self.bot.started_at.timestamp())}:R>\n"
                 f"Bot Last Connected: <t:{round(self.bot.last_logged_in.timestamp())}:R>\n"
-                f"Bot Created At: <t:{round(self.bot.user.created_at.timestamp())}:R>\n"
+                f"Bot Created: <t:{round(self.bot.user.created_at.timestamp())}:R>\n"
                 f"\n"
                 f"Cached Users: {len(self.bot.users):,}\n"
                 f"Guilds: {len(self.bot.guilds):,}\n"

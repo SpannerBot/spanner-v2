@@ -19,7 +19,15 @@ except ImportError:
     zlib = None
 
 
-__all__ = ("session", "run_blocking", "get_prefix", "screenshot_page")
+__all__ = (
+    "case_type_names",
+    "Emojis",
+    "session",
+    "run_blocking",
+    "get_guild",
+    "get_prefix",
+    "format_time"
+)
 
 case_type_names = {
     0: "warning",
@@ -111,45 +119,6 @@ async def get_prefix(_, message: discord.Message) -> List[str]:
 
     guild, __ = await Guild.objects.get_or_create({}, id=message.guild.id)
     return commands.when_mentioned_or(guild.prefix)(_, message)
-
-
-async def screenshot_page(
-    session: httpx.AsyncClient = None, *, url: str, compress: bool = False, width: int = 1920, height: int = 1080
-) -> bytes:
-    """
-    Take a screenshot of a web page.
-
-    Args:
-        session: The session to use for the request.
-        url: The URL to take the screenshot of.
-        compress: Whether or not to compress the image.
-        width: The width of the screenshot.
-        height: The height of the screenshot.
-
-    Returns:
-        The screenshot of the page.
-    """
-    if not session:
-        session = httpx.AsyncClient(
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36",
-            },
-            timeout=httpx.Timeout(120),
-        )
-    async with session:
-        response = await session.get(
-            "http://localhost:3000/screenshot/" + quote(url), params=dict(width=width, height=height)
-        )
-        if response.status_code != 200:
-            raise RuntimeError(f"Could not get screenshot of {url}: {response.status_code}")
-
-        content: bytes = await response.aread()
-        if compress:
-            if not zlib:
-                raise RuntimeError("zlib is not installed")
-            content: bytes = await run_blocking(zlib.compress, content, 9)
-        return content
 
 
 def format_time(seconds: int):

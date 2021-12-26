@@ -4,9 +4,9 @@ import uuid
 import discord
 from discord.ext import commands
 
-from src import utils
+from src.utils import utils
 from src.database import Cases, CaseType, Guild, NoMatch
-from src.views import YesNoPrompt
+from src.utils.views import YesNoPrompt
 
 
 class PermissionsError(commands.CommandError):
