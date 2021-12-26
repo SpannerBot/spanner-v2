@@ -1,5 +1,6 @@
 import asyncio
 import subprocess
+import warnings
 import sys
 from functools import partial
 from threading import Thread
@@ -57,8 +58,10 @@ class _SessionContainer:
         return getattr(self.session, item)
 
     def __del__(self):
-        if self.session is not None and self.session.is_closed is False:
+        warnings.simplefilter("ignore", Warning)
+        if self.session is not None and self.session.is_closed is False and asyncio is not None:
             asyncio.create_task(self.session.aclose())
+        warnings.simplefilter("default", Warning)
 
     async def __aenter__(self):
         return self.session

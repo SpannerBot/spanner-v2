@@ -41,6 +41,8 @@ class Bot(commands.Bot):
 
         self.debug = is_debug
         self.console = Console()
+        if os.getenv("COLOURS", "True").lower() == "false":
+            self.console.log = self.console.print
         self.terminal = self.console
         self.started_at = self.last_logged_in = None
         self.loop.run_until_complete(models.create_all())

@@ -1,0 +1,5 @@
+venv
+.run
+.env
+main.db
+spanner.log
