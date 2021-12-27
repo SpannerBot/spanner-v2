@@ -1,8 +1,11 @@
+import datetime
+import re
 import textwrap
 import uuid
 
 import discord
-from discord.ext import commands
+from discord import SlashCommandGroup
+from discord.ext import commands, pages
 
 from src.utils import utils
 from src.database import Cases, CaseType, Guild, NoMatch
@@ -29,7 +32,7 @@ class Moderation(commands.Cog):
         return last_case.id + 1
 
     @staticmethod
-    def check_action_permissions(author: discord.Member, target: discord.Member, permission_name: str) -> bool:
+    def check_action_permissions(author: discord.Member, target: discord.Member, permission_name: str, *, allow_self: bool = True) -> bool:
         # Step 1: Check if the bot has the required permissions.
         if getattr(author.guild.me.guild_permissions, permission_name) is False:
             raise PermissionsError(reason="I do not have the required permissions to perform this action.")
@@ -41,14 +44,16 @@ class Moderation(commands.Cog):
         else:
             # Step 2.1: Check if the author is higher than the target.
             if author.top_role <= target.top_role:
-                raise PermissionsError(
-                    reason="You cannot perform actions on users with a higher or equal role than you."
-                )
+                if author.id == target.id and not allow_self:
+                    raise PermissionsError(
+                        reason="You cannot perform actions on users with a higher or equal role than you."
+                    )
             # Step 2.2: Check if the bot is higher than the target.
             if target.top_role <= author.guild.me.top_role:
-                raise PermissionsError(
-                    reason="You cannot perform actions on users with a higher or equal role than me."
-                )
+                if author.id == target.id and not allow_self:
+                    raise PermissionsError(
+                        reason="You cannot perform actions on users with a higher or equal role than me."
+                    )
             # Step 2.3: Check if the author has the required permissions.
             if getattr(author.guild_permissions, permission_name) is False:
                 raise PermissionsError(reason="You do not have the required permissions to perform this action.")
@@ -241,7 +246,91 @@ class Moderation(commands.Cog):
                 content="User {!s} has been kicked.\nCase ID: {!s}".format(member, case.id), embed=None, view=None
             )
 
-    @commands.slash_command(name="get-case")
+    @commands.slash_command(name="mute")
+    async def mute(self, ctx: discord.ApplicationContext, member: discord.Member, time: str, reason: str = "No Reason Provided"):
+        try:
+            self.check_action_permissions(ctx.author, member, "moderate_members")
+        except PermissionsError as e:
+            return await ctx.respond(str(e), ephemeral=True)
+
+        try:
+            seconds = utils.parse_time(time)
+        except ValueError:
+            return await ctx.respond("Invalid time format. Try passing something like '30 seconds'.", ephemeral=True)
+        else:
+            max_time = discord.utils.utcnow() + datetime.timedelta(days=28)
+            end = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)
+            if end > max_time or (end - discord.utils.utcnow()).total_seconds() <= 60:
+                return await ctx.respond(
+                    "You can't mute a user for more than 28 days or less than 1 minute.",
+                    ephemeral=True
+                )
+
+        view = YesNoPrompt(timeout=300.0)
+        await ctx.respond(
+            f"Are you sure you want to mute {member} until <t:{round(end.timestamp())}>?",
+            ephemeral=True,
+            view=view
+        )
+        await view.wait()
+        if not view.confirm:
+            await ctx.edit(content="Mute cancelled.", embed=None, view=None)
+            return
+        await ctx.edit(view=None)
+
+        guild = await utils.get_guild(ctx.guild)
+        case = await Cases.objects.create(
+            id=await self.get_next_case_id(guild),
+            guild=guild,
+            moderator=ctx.author.id,
+            target=member.id,
+            reason=reason,
+            type=CaseType.TEMP_MUTE,
+            expire_at=end
+        )
+
+        try:
+            end = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)  # recalculate
+            await member.timeout(until=end, reason=f"Case#{case.entry_id!s}| " + reason)
+        except discord.HTTPException as e:
+            await case.delete()
+            return await ctx.edit(content="Failed to mute user: {!s}".format(e), embed=None)
+        except Exception:
+            await case.delete()
+            raise
+        else:
+            return await ctx.edit(
+                content=f"User {member} has been muted and will be unmuted <t:{round(end.timestamp())}:R>.\n"
+                        f"Case ID: {case.id!s}", embed=None, view=None
+            )
+
+    cases_group = SlashCommandGroup("cases", "Case management")
+
+    @cases_group.command(name="delete")
+    async def delete_case(self, ctx: discord.ApplicationContext, case_id: int):
+        try:
+            self.check_action_permissions(ctx.author, ctx.author, "manage_guild")
+        except PermissionsError as e:
+            return await ctx.respond(str(e), ephemeral=True)
+
+        guild = await utils.get_guild(ctx.guild)
+        try:
+            case = await Cases.objects.get(id=case_id, guild=guild)
+        except NoMatch:
+            return await ctx.respond("Case not found.", ephemeral=True)
+
+        view = YesNoPrompt(timeout=300.0)
+        await ctx.respond(
+            "Are you sure you would like to delete case #{!s}?".format(case.entry_id),
+            view=view
+        )
+        await view.wait()
+        if not view.confirm:
+            return await ctx.edit(content="Case deletion cancelled.", view=None)
+        await case.delete()
+        return await ctx.edit(content="Deleted case #{!s}.".format(case.entry_id), view=None)
+
+    @cases_group.command(name="view")
     async def get_case(self, ctx: discord.ApplicationContext, case_id: str):
         try:
             self.check_action_permissions(ctx.author, ctx.author, "manage_guild")
@@ -275,6 +364,47 @@ class Moderation(commands.Cog):
         embed.set_author(name=moderator.name, icon_url=moderator.avatar.url)
         embed.set_footer(text=target.name, icon_url=target.avatar.url)
         return await ctx.respond(embed=embed, ephemeral=True)
+
+    @cases_group.command(name="list")
+    async def list_cases(self, ctx: discord.ApplicationContext):
+        """Lists all cases for this guild"""
+        try:
+            self.check_action_permissions(ctx.author, ctx.author, "manage_guild")
+        except PermissionsError as e:
+            return await ctx.respond(str(e), ephemeral=True)
+
+        guild = await utils.get_guild(ctx.guild)
+        cases = await Cases.objects.filter(guild=guild).order_by("-id").all()
+        if not cases:
+            return await ctx.respond("No cases found.", ephemeral=True)
+        else:
+            paginator = commands.Paginator("", "", max_size=4069)
+            fmt = "{0.id!s}: {0.type.name!s} | `{1!s}` | <t:{2}:F>"
+            for case in cases:
+                paginator.add_line(
+                    fmt.format(
+                        case,
+                        self.bot.get_user(case.target) or case.target,
+                        round(case.created_at.timestamp()),
+                    )
+                )
+
+            made_pages = paginator.pages
+
+            def get_page(n: int, desc: str) -> discord.Embed:
+                percent = round(n / len(made_pages) * 100)
+                return discord.Embed(
+                    title="Cases | Page #{!s}".format(n),
+                    description=desc,
+                    colour=discord.Colour.blue(),
+                    timestamp=discord.utils.utcnow()
+                ).set_footer(text=f"{percent}% ({n}/{len(made_pages)} pages)")
+
+            paginator = pages.Paginator(
+                [get_page(*args) for args in enumerate(made_pages, 1)],
+                timeout=300
+            )
+            return await paginator.send(ctx, ephemeral=True)
 
 
 def setup(bot):

@@ -1,4 +1,5 @@
 import asyncio
+import re
 import subprocess
 import warnings
 import sys
@@ -19,7 +20,6 @@ try:
 except ImportError:
     zlib = None
 
-
 __all__ = (
     "case_type_names",
     "Emojis",
@@ -27,7 +27,8 @@ __all__ = (
     "run_blocking",
     "get_guild",
     "get_prefix",
-    "format_time"
+    "format_time",
+    "parse_time"
 )
 
 case_type_names = {
@@ -48,8 +49,8 @@ class _SessionContainer:
         self.session = httpx.AsyncClient(
             headers={
                 "User-Agent": f"DiscordBot (Spanner/v2; https://github.com/EEKIM10/spanner-v2; "
-                f"httpx/{httpx.__version__}); pycord/{discord.__version__}; "
-                f"python/{'.'.join(map(str, sys.version_info[:3]))})"
+                              f"httpx/{httpx.__version__}); pycord/{discord.__version__}; "
+                              f"python/{'.'.join(map(str, sys.version_info[:3]))})"
             }
         )
 
@@ -140,6 +141,30 @@ def format_time(seconds: int):
     if seconds:
         values.append("%d seconds" % seconds)
     return ", ".join(values)
+
+
+TIME_REGEX = re.compile(
+    r"(?P<len>[0-9]+(\.([0-9]{0,8}))?)(\s){0,2}(?P<span>(s(ec(ond)?)?|m(in(ute)?)?|h((ou)?r)?|d(ay)?|w(eek)?)(s)?)",
+    re.IGNORECASE | re.VERBOSE
+)
+TIMESPANS = {
+    "s": 1,
+    "m": 60,
+    "h": 3600,
+    "d": 86400,
+    "w": 604800
+}
+
+
+def parse_time(time: str) -> int:
+    """Parses a timespan (e.g. 1d, 3 hours) into seconds"""
+    time = time.strip()
+    match = TIME_REGEX.match(time)
+    if not match:
+        raise ValueError("Invalid time format")
+    length = int(match.group("len"))
+    span = match.group("span").lower()[0]
+    return length * TIMESPANS[span]
 
 
 async def get_guild(guild: discord.Guild) -> Guild:

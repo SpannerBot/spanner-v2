@@ -57,7 +57,25 @@ class Bot(commands.Bot):
         self.load_extension("jishaku")
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
-        super().run(os.environ["DISCORD_TOKEN"])
+        try:
+            super().run(os.environ["DISCORD_TOKEN"].strip('"').strip("'"))
+        except (TypeError, discord.DiscordException) as e:
+            self.on_connection_error(e)
+            raise
+
+    def on_connection_error(self, error: Exception):
+        class ErrorType:
+            type_error = TypeError
+
+        match type(error):
+            case discord.GatewayNotFound:
+                self.console.log("[red]Failed to connect to websocket: GatewayNotFound; Perhaps there is an outage?[/]")
+            case discord.LoginFailure:
+                self.console.log("[red]Failed to log in: LoginFailure; check your token is valid.[/]")
+            case ErrorType.type_error:
+                self.console.log("[red]Failed to log in: TypeError - Invalid token type.")
+            case _:
+                self.console.log("[red]Failed to connect: Unknown error: %r" % error)
 
     async def sync_commands(self) -> None:
         return await super().sync_commands()
