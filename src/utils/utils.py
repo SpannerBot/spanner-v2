@@ -5,7 +5,7 @@ import warnings
 import sys
 from functools import partial
 from threading import Thread
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union, Iterable, Sized
 from urllib.parse import quote
 
 import aiohttp
@@ -28,7 +28,8 @@ __all__ = (
     "get_guild",
     "get_prefix",
     "format_time",
-    "parse_time"
+    "parse_time",
+    "chunk",
 )
 
 case_type_names = {
@@ -49,8 +50,8 @@ class _SessionContainer:
         self.session = httpx.AsyncClient(
             headers={
                 "User-Agent": f"DiscordBot (Spanner/v2; https://github.com/EEKIM10/spanner-v2; "
-                              f"httpx/{httpx.__version__}); pycord/{discord.__version__}; "
-                              f"python/{'.'.join(map(str, sys.version_info[:3]))})"
+                f"httpx/{httpx.__version__}); pycord/{discord.__version__}; "
+                f"python/{'.'.join(map(str, sys.version_info[:3]))})"
             }
         )
 
@@ -145,15 +146,9 @@ def format_time(seconds: int):
 
 TIME_REGEX = re.compile(
     r"(?P<len>[0-9]+(\.([0-9]{0,8}))?)(\s){0,2}(?P<span>(s(ec(ond)?)?|m(in(ute)?)?|h((ou)?r)?|d(ay)?|w(eek)?)(s)?)",
-    re.IGNORECASE | re.VERBOSE
+    re.IGNORECASE | re.VERBOSE,
 )
-TIMESPANS = {
-    "s": 1,
-    "m": 60,
-    "h": 3600,
-    "d": 86400,
-    "w": 604800
-}
+TIMESPANS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
 
 
 def parse_time(time: str) -> int:
@@ -169,3 +164,12 @@ def parse_time(time: str) -> int:
 
 async def get_guild(guild: discord.Guild) -> Guild:
     return await Guild.objects.get(id=guild.id)
+
+
+def chunk(iterable: Sized, max_chunk_size: int) -> Iterable:
+    """Yield successive n-sized chunks from lst."""
+    # I have taken this function SO MANY TIMES
+    # https://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks source
+
+    for i in range(0, len(iterable), max_chunk_size):
+        yield iterable[i : i + max_chunk_size]

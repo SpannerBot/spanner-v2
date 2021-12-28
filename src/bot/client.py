@@ -54,6 +54,7 @@ class Bot(commands.Bot):
         self.load_extension("src.cogs.debug")
         self.load_extension("src.cogs.info")
         self.load_extension("src.cogs.mod")
+        self.load_extension("src.cogs.util")
         self.load_extension("jishaku")
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
@@ -100,6 +101,11 @@ class Bot(commands.Bot):
 
     async def on_command_error(self, context: commands.Context, exception: commands.CommandError) -> None:
         if isinstance(exception, commands.CommandNotFound):
+            extra = (
+                "However, only a few select servers have access at this time. Join discord.gg/TveBeG7 to beta " "test!"
+                if self.debug
+                else ""
+            )
             help_text = textwrap.dedent(
                 f"""
                 The command you were looking for was not found.
@@ -107,10 +113,10 @@ class Bot(commands.Bot):
                 If you want to see a list of commands that are text-based, please run `{context.clean_prefix}help`.
                 **Note:** A lot of commands have been moved to discord's application commands.
                 Most commands are now slash commands, so you can see them when you run `/`.
-                {'However, only a few select servers have access at this time. Join discord.gg/TveBeG7 to beta test!' if self.debug else ''}
+                {extra}
                 """
             )
-            await context.reply(help_text)
+            await context.reply(help_text, delete_after=30)
         await super().on_command_error(context, exception)
 
 

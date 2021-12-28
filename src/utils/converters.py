@@ -5,9 +5,7 @@ from discord import ApplicationContext as Context
 from discord.ext.commands import UserNotFound
 from discord.ext.commands.converter import *
 
-__all__ = (
-    "UserConverter",
-)
+__all__ = ("UserConverter",)
 
 
 # Patched from commands.UserConverter due to incompatibility with interactions
@@ -33,7 +31,7 @@ class UserConverter(IDConverter[discord.User]):
 
     # noinspection PyProtectedMember
     async def convert(self, ctx: Context, argument: str) -> discord.User:
-        match = self._get_id_match(argument) or re.match(r'<@!?([0-9]{15,20})>$', argument)
+        match = self._get_id_match(argument) or re.match(r"<@!?([0-9]{15,20})>$", argument)
         state = ctx._state
 
         if match is not None:
@@ -47,12 +45,12 @@ class UserConverter(IDConverter[discord.User]):
         arg = argument
 
         # Remove the '@' character if this is the first character from the argument
-        if arg[0] == '@':
+        if arg[0] == "@":
             # Remove first character
             arg = arg[1:]
 
         # check for discriminator if it exists,
-        if len(arg) > 5 and arg[-5] == '#':
+        if len(arg) > 5 and arg[-5] == "#":
             discrim = arg[-4:]
             name = arg[:-5]
 
