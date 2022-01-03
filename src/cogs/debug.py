@@ -19,7 +19,8 @@ class Debug(commands.Cog):
         self.loaded_at = datetime.now()
         self._last_result = None
 
-    def cleanup_code(self, content):
+    @staticmethod
+    def cleanup_code(content):
         """Automatically removes code blocks from the code."""
         # remove ```py\n```
         if content.startswith("```") and content.endswith("```"):
@@ -28,7 +29,8 @@ class Debug(commands.Cog):
         # remove `foo`
         return content.strip("` \n")
 
-    def get_syntax_error(self, e):
+    @staticmethod
+    def get_syntax_error(e):
         if e.text is None:
             return f"```py\n{e.__class__.__name__}: {e}\n```"
         return f'```py\n{e.text}{"^":>{e.offset}}\n{e.__class__.__name__}: {e}```'

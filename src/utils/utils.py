@@ -1,6 +1,7 @@
 import asyncio
 import re
 import subprocess
+import typing
 import warnings
 import sys
 from functools import partial
@@ -30,6 +31,7 @@ __all__ = (
     "format_time",
     "parse_time",
     "chunk",
+    "SessionWrapper"
 )
 
 case_type_names = {
@@ -46,6 +48,13 @@ case_type_names = {
 
 
 class _SessionContainer:
+    if typing.TYPE_CHECKING:
+        session: httpx.AsyncClient
+        get: "session.get"
+        post: "session.post"
+        put: "session.put"
+        delete: "session.delete"
+
     def __init__(self):
         self.session = httpx.AsyncClient(
             headers={
@@ -60,10 +69,11 @@ class _SessionContainer:
         return getattr(self.session, item)
 
     def __del__(self):
-        warnings.simplefilter("ignore", Warning)
-        if self.session is not None and self.session.is_closed is False and asyncio is not None:
-            asyncio.create_task(self.session.aclose())
-        warnings.simplefilter("default", Warning)
+        if warnings:
+            warnings.simplefilter("ignore", Warning)
+            if self.session is not None and self.session.is_closed is False and asyncio is not None:
+                asyncio.create_task(self.session.aclose())
+            warnings.simplefilter("default", Warning)
 
     async def __aenter__(self):
         return self.session
@@ -73,6 +83,14 @@ class _SessionContainer:
 
     def __bool__(self):
         return not self.session.is_closed
+
+
+class SessionWrapper:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await session.session.aclose()
 
 
 class Emojis:

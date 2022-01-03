@@ -1,19 +1,12 @@
 import copy
-import io
-import subprocess
 import textwrap
-import traceback
-from contextlib import redirect_stdout
 from collections import deque
-from datetime import datetime
 from typing import Dict, List
 
 import discord
 from discord import SlashCommandGroup
-from discord.commands import permissions
 from discord.ext import commands, pages
 
-from src.utils import utils
 from src.bot.client import Bot
 
 
@@ -38,6 +31,8 @@ class Utility(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
+        if before.author == self.bot.user:
+            return
         if before.channel not in self.edited_snipes:
             self.edited_snipes[before.channel] = deque([[before, after]], maxlen=1000)
         else:

@@ -1,7 +1,9 @@
+import asyncio
 import os
 import textwrap
 
 import discord
+import httpx
 from discord.ext import commands
 from rich.console import Console
 
@@ -118,6 +120,36 @@ class Bot(commands.Bot):
             )
             await context.reply(help_text, delete_after=30)
         await super().on_command_error(context, exception)
+
+    async def start(self, token: str, *, reconnect: bool = True) -> None:
+        self.console.log("Waiting for network...")
+        await self.wait_for_network()
+        self.console.log("Network ready!")
+        async with utils.SessionWrapper():
+            while True:
+                try:
+                    await super().start(token, reconnect=reconnect)
+                except (discord.LoginFailure, discord.HTTPException, OSError):
+                    await self.wait_for_network()
+                else:
+                    break
+
+    @staticmethod
+    async def wait_for_network(roof: int = 30) -> int:
+        attempts = 0
+        while True:
+            try:
+                response = await utils.session.get("https://discord.com/api/v9/gateway")
+                assert response.status_code == 200
+                assert response.headers.get("content-type") == "application/json"
+                data = response.json()
+                assert data.pop("url").startswith("wss://")
+            except (httpx.HTTPError, AssertionError, KeyError, OSError):
+                attempts += 1
+                await asyncio.sleep(min(attempts, roof))
+            else:
+                break
+        return attempts
 
 
 bot = Bot()
