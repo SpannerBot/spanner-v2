@@ -2,6 +2,9 @@ import asyncio
 import logging
 import sys
 import os
+from pathlib import Path
+
+os.chdir(Path(__file__).parent.absolute())
 
 os.environ["JISHAKU_RETAIN"] = "true"
 
