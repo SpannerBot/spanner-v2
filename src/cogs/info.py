@@ -61,9 +61,14 @@ class Info(commands.Cog):
             f"**Avatar URL**: {user.avatar.url}",
         ]
 
-        if guild:
+        if isinstance(user, discord.Member):
             if user.display_avatar != user.avatar:
                 values.append("**Display Avatar**: %s" % user.display_avatar.url)
+
+            if user.communication_disabled_until and user.communication_disabled_until >= discord.utils.utcnow():
+                values.append(
+                    f"**Timeout expires:** <t:{round(user.communication_disabled_until.timestamp())}:R>"
+                )
 
         values = list(filter(lambda x: x is not None, values))  # remove guild-only shit
         return values
