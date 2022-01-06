@@ -5,13 +5,14 @@ import os
 
 os.environ["JISHAKU_RETAIN"] = "true"
 
-logging.basicConfig(
-    filename="spanner.log",
-    level=logging.INFO,
-    filemode="w",
-    format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
-    datefmt="%d-%m-%Y %H:%M:%S",
-)
+if os.environ.get("LOGGING", "true").lower().startswith("tr"):
+    logging.basicConfig(
+        filename="spanner.log",
+        level=logging.INFO,
+        filemode="w",
+        format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
+        datefmt="%d-%m-%Y %H:%M:%S",
+    )
 
 if sys.version_info >= (3, 10):
     loop = asyncio.new_event_loop()
