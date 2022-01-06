@@ -1,7 +1,7 @@
 from discord.ext import commands
 
 
-__all__ = "PermissionsError",
+__all__ = ("PermissionsError",)
 
 
 class PermissionsError(commands.CommandError):

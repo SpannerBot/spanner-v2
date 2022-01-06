@@ -31,7 +31,7 @@ __all__ = (
     "format_time",
     "parse_time",
     "chunk",
-    "SessionWrapper"
+    "SessionWrapper",
 )
 
 case_type_names = {

@@ -90,7 +90,13 @@ class Bot(commands.Bot):
     async def on_ready(self):
         self.last_logged_in = discord.utils.utcnow()
         self.console.log("Bot is logged in to discord!")
-        self.console.log("User: [%s](%s)" % (self.user, discord.utils.oauth_url(self.user.id)))
+        self.console.log(
+            "User: [link=%s]%s[/]"
+            % (
+                discord.utils.oauth_url(self.user.id, scopes="bot+applications.commands"),
+                self.user,
+            )
+        )
 
     async def on_command(self, ctx: commands.Context):
         self.console.log(f"[blue]{ctx.author}[/] used a text command: [b]{ctx.command.qualified_name!r}[/]")
