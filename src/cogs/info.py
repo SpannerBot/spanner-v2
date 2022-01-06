@@ -206,7 +206,7 @@ class Info(commands.Cog):
                 f"\n"
                 f"Python Version: {sys.version.split(' ')[0]}\n"
                 f"Pycord Version: {discord.__version__}\n"
-                f"Bot Version: v2#{spanner_version}\n"
+                f"Bot Version: [v2#{spanner_version}](https://github.com/EEKIM10/spanner-v2/tree/{spanner_version})\n"
                 f"OS Version: {os_version}",
                 colour=0x049319,
                 timestamp=discord.utils.utcnow(),
