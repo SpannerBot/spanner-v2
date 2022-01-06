@@ -248,7 +248,7 @@ class Moderation(commands.Cog):
             await member.kick(reason=f"Case#{case.entry_id!s}| " + reason)
         except discord.HTTPException as e:
             await case.delete()
-            return await ctx.edit(content="Failed to ban user: {!s}".format(e), embed=None)
+            return await ctx.edit(content="Failed to kick user: {!s}".format(e), embed=None)
         except Exception:
             await case.delete()
             raise
