@@ -49,6 +49,7 @@ class Utility(commands.Cog):
     @snipe.command()
     async def deleted(self, ctx: discord.ApplicationContext):
         """Shows you deleted messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
+        await ctx.defer()
         _pages = []
         if ctx.channel in self.deleted_snipes:
             for message in reversed(self.deleted_snipes[ctx.channel]):
@@ -72,6 +73,7 @@ class Utility(commands.Cog):
     @snipe.command()
     async def edits(self, ctx: discord.ApplicationContext):
         """Shows you edited messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
+        await ctx.defer()
         _pages = []
         if ctx.channel in self.edited_snipes:
             for message in reversed(self.edited_snipes[ctx.channel]):
@@ -98,6 +100,7 @@ class Utility(commands.Cog):
     @permissions.is_owner()
     async def snipes_info(self, ctx: discord.ApplicationContext, snipe_type: str = "all"):
         """(owner only) displays information on a specific snipe cache"""
+        await ctx.defer()
 
         def generate_embed(attr_name: Literal["deleted_snipes", "edited_snipes"]):
             attr = getattr(self, attr_name)
