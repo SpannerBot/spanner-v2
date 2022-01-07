@@ -97,7 +97,6 @@ class Utility(commands.Cog):
         await paginator.send(ctx)
 
     @snipe.command(name="info")
-    @permissions.is_owner()
     async def snipes_info(self, ctx: discord.ApplicationContext, snipe_type: str = "all"):
         """(owner only) displays information on a specific snipe cache"""
         await ctx.defer()
@@ -123,6 +122,8 @@ class Utility(commands.Cog):
             embeds.append(generate_embed("deleted_snipes"))
         elif snipe_type == "edited":
             embeds.append(generate_embed("edited_snipes"))
+        else:
+            embeds.append(discord.Embed(description="Invalid snipe type."))
         return await ctx.respond(embeds=embeds)
 
 
