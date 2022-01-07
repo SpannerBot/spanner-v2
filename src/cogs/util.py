@@ -109,6 +109,7 @@ class Utility(commands.Cog):
                             f"**Memory used**: {naturalsize(size, True)}",
                 colour=discord.Colour.random(),
             )
+            return embed
 
         embeds = []
 
