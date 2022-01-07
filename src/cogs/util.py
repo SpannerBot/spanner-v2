@@ -1,16 +1,19 @@
 import copy
 import sys
 import textwrap
+import logging
 from collections import deque
 from typing import Dict, List, Literal
 
 import discord
 from discord import SlashCommandGroup
-from discord.commands import permissions
 from discord.ext import commands, pages
 
 from src.bot.client import Bot
 from src.vendor.humanize.size import naturalsize
+
+
+logger = logging.getLogger(__name__)
 
 
 class Utility(commands.Cog):
@@ -21,25 +24,39 @@ class Utility(commands.Cog):
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages: List[discord.Message]):
+        logger.debug("Got bulk message delete event with %s messages.", len(messages))
         for message in messages:
+            logger.debug("Processing message delete for message %s-%s", message.channel.id, message.id)
             await self.on_message_delete(message)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
         message_copy = copy.copy(message)
         if message.channel not in self.deleted_snipes:
+            logger.debug("Creating new delete-snipe queue for channel %r.", message.channel.id)
             self.deleted_snipes[message.channel] = deque([message_copy], maxlen=1000)
         else:
             self.deleted_snipes[message.channel].append(message_copy)
+            logger.debug(
+                "Channel %r already has a delete-deque, of size %s.",
+                message.channel.id,
+                len(self.deleted_snipes[message.channel]),
+            )
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         if before.author == self.bot.user:
             return
         if before.channel not in self.edited_snipes:
+            logger.debug("Creating new edit-snipe queue for channel %r.", after.channel.id)
             self.edited_snipes[before.channel] = deque([[before, after]], maxlen=1000)
         else:
             self.edited_snipes[before.channel].append([before, after])
+            logger.debug(
+                "Channel %r already has an edit-deque, of size %s.",
+                after.channel.id,
+                len(self.deleted_snipes[after.channel]),
+            )
 
     snipe = SlashCommandGroup(
         "snipe",
@@ -107,8 +124,8 @@ class Utility(commands.Cog):
             embed = discord.Embed(
                 title=f"self.{attr_name}:",
                 description=f"**Channel Entries (keys)**: {len(attr):,}\n"
-                            f"**Total Messages**: {sum(len(channel_snipes) for channel_snipes in attr.values()):,}\n"
-                            f"**Memory used**: {naturalsize(size, True)}",
+                f"**Total Messages**: {sum(len(channel_snipes) for channel_snipes in attr.values()):,}\n"
+                f"**Memory used**: {naturalsize(size, True)}",
                 colour=discord.Colour.random(),
             )
             return embed

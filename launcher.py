@@ -2,20 +2,26 @@ import asyncio
 import logging
 import sys
 import os
+import dotenv
 from pathlib import Path
 
 os.chdir(Path(__file__).parent.absolute())
+dotenv.load_dotenv(Path(__file__).parent.absolute() / '.env')
 
 os.environ["JISHAKU_RETAIN"] = "true"
+log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
 
-if os.environ.get("LOGGING", "true").lower().startswith("tr"):
-    logging.basicConfig(
-        filename="spanner.log",
-        level=logging.INFO,
-        filemode="w",
-        format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
-        datefmt="%d-%m-%Y %H:%M:%S",
-    )
+logging.basicConfig(
+    filename="spanner.log",
+    level=log_level,
+    filemode="w",
+    format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
+    datefmt="%d-%m-%Y %H:%M:%S",
+    encoding="utf-8",
+    errors="replace"
+)
+
+logging.info("Configured log level: %s", os.getenv("LOG_LEVEL", "INFO").upper().strip())
 
 if sys.version_info >= (3, 10):
     loop = asyncio.new_event_loop()
@@ -73,6 +79,8 @@ if __name__ == "__main__":
             "unlikely to have propagated from the bot itself."
         )
         sys.exit(1)
+    finally:
+        logging.info("End of log.")
 
 
 else:
