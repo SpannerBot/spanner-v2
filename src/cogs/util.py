@@ -1,13 +1,16 @@
 import copy
+import sys
 import textwrap
 from collections import deque
-from typing import Dict, List
+from typing import Dict, List, Literal
 
 import discord
 from discord import SlashCommandGroup
+from discord.commands import permissions
 from discord.ext import commands, pages
 
 from src.bot.client import Bot
+from src.vendor.humanize.size import naturalsize
 
 
 class Utility(commands.Cog):
@@ -90,6 +93,33 @@ class Utility(commands.Cog):
 
         paginator = pages.Paginator(_pages)
         await paginator.send(ctx)
+
+    @snipe.command(name="info")
+    @permissions.is_owner()
+    async def snipes_info(self, ctx: discord.ApplicationContext, snipe_type: str = "all"):
+        """(owner only) displays information on a specific snipe cache"""
+
+        def generate_embed(attr_name: Literal["deleted_snipes", "edited_snipes"]):
+            attr = getattr(self, attr_name)
+            size = sys.getsizeof(attr)
+            embed = discord.Embed(
+                title=f"self.{attr_name}:",
+                description=f"**Channel Entries (keys)**: {len(attr):,}\n"
+                            f"**Total Messages**: {sum(len(channel_snipes) for channel_snipes in attr.values()):,}\n"
+                            f"**Memory used**: {naturalsize(size, True)}",
+                colour=discord.Colour.random(),
+            )
+
+        embeds = []
+
+        if snipe_type == "all":
+            embeds.append(generate_embed("deleted_snipes"))
+            embeds.append(generate_embed("edited_snipes"))
+        elif snipe_type == "deleted":
+            embeds.append(generate_embed("deleted_snipes"))
+        elif snipe_type == "edited":
+            embeds.append(generate_embed("edited_snipes"))
+        return await ctx.respond(embeds=embeds)
 
 
 def setup(bot):

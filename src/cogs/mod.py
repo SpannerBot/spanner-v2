@@ -304,7 +304,7 @@ class Moderation(commands.Cog):
             await member.timeout(until=end, reason=f"Case#{case.entry_id!s}| " + reason)
         except discord.HTTPException as e:
             await case.delete()
-            return await ctx.edit(content="Failed to mute user: {!s}".format(e), embed=None)
+            return await ctx.edit(content="Failed to unmute user: {!s}".format(e), embed=None)
         except Exception:
             await case.delete()
             raise
