@@ -180,7 +180,7 @@ def parse_time(time: str) -> int:
     return length * TIMESPANS[span]
 
 
-async def get_guild(guild: discord.Guild) -> Guild:
+async def get_guild(guild: discord.Guild):
     return await Guild.objects.get(id=guild.id)
 
 

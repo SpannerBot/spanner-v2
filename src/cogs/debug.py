@@ -4,6 +4,7 @@ import textwrap
 import traceback
 from contextlib import redirect_stdout
 from datetime import datetime
+from typing import Union
 
 import discord
 from discord.commands import permissions
@@ -17,23 +18,40 @@ class Debug(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot: Bot = bot
         self.loaded_at = datetime.now()
-        self._last_result = None
 
-    @staticmethod
-    def cleanup_code(content):
-        """Automatically removes code blocks from the code."""
-        # remove ```py\n```
-        if content.startswith("```") and content.endswith("```"):
-            return "\n".join(content.split("\n")[1:-1])
+    @commands.command(name="type")
+    @commands.is_owner()
+    async def find_id_type(self, ctx: commands.Context, *, obj: int):
+        converters = (
+            commands.GuildChannelConverter,
+            commands.MemberConverter,
+            commands.UserConverter,
+            commands.ObjectConverter,
+        )
+        result: Union[
+            discord.abc.GuildChannel,
+            discord.Member,
+            discord.User,
+            discord.Object
+        ]
+        async with ctx.channel.typing():
+            for converter in converters:
+                try:
+                    result = await converter().convert(ctx, str(obj))
+                except commands.ConversionError:
+                    continue
+                else:
+                    break
 
-        # remove `foo`
-        return content.strip("` \n")
-
-    @staticmethod
-    def get_syntax_error(e):
-        if e.text is None:
-            return f"```py\n{e.__class__.__name__}: {e}\n```"
-        return f'```py\n{e.text}{"^":>{e.offset}}\n{e.__class__.__name__}: {e}```'
+        if isinstance(result, discord.abc.GuildChannel):
+            # noinspection PyUnresolvedReferences
+            return await ctx.reply(
+                f"{result.id} is a {result.type.name} channel ({result.mention}) in {result.guild.name} "
+                f"({result.guild.id})"
+            )
+        return await ctx.reply(
+            f"{obj} is a {result.__class__.__name__} with ID {result.id}."
+        )
 
     @commands.slash_command(name="version")
     @permissions.is_owner()
@@ -61,51 +79,6 @@ class Debug(commands.Cog):
         """Shows the bot's latency."""
         await ctx.respond(f"Pong! {round(self.bot.latency * 1000, 2)}ms")
 
-    @commands.slash_command(pass_context=True, hidden=True, name="eval")
-    @permissions.is_owner()
-    async def _eval(self, ctx, body: str, private: bool = False):
-        """Evaluates a code"""
-        await ctx.defer(ephemeral=private)
-
-        env = {
-            "bot": self.bot,
-            "ctx": ctx,
-            "channel": ctx.channel,
-            "author": ctx.author,
-            "guild": ctx.guild,
-            "message": ctx.message,
-            "_": self._last_result,
-        }
-
-        env.update(globals())
-
-        body = self.cleanup_code(body)
-        stdout = io.StringIO()
-
-        to_compile = f'async def func():\n{textwrap.indent(body, "  ")}'
-
-        try:
-            exec(to_compile, env)
-        except Exception as e:
-            return await ctx.respond(f"```py\n{e.__class__.__name__}: {e}\n```", ephemeral=private)
-
-        func = env["func"]
-        try:
-            with redirect_stdout(stdout):
-                ret = await func()
-        except Exception as e:
-            value = stdout.getvalue()
-            await ctx.respond(f"```py\n{value}{traceback.format_exc()}\n```", ephemeral=private)
-        else:
-            value = stdout.getvalue()
-
-            if ret is None:
-                if value:
-                    await ctx.respond(f"```py\n{value}\n```", ephemeral=private)
-            else:
-                self._last_result = ret
-                await ctx.respond(f"```py\n{value}{ret}\n```", ephemeral=private)
-
     @commands.slash_command(name="clean")
     async def clean_bot_message(self, ctx: discord.ApplicationContext, max_search: int = 1000):
         """Deletes all messages sent by the bot up to <max_search> messages."""
@@ -123,17 +96,28 @@ class Debug(commands.Cog):
 
         await ctx.defer()
 
+        prefixes = (
+            "s!",
+            ctx.me.mention
+        )
+        if ctx.guild:
+            guild = await utils.get_guild(ctx.guild)
+            prefixes = (
+                guild.prefix,
+                ctx.me.mention
+            )
+
         def purge_check(_message: discord.Message):
-            return _message.author == self.bot.user
+            return _message.author == self.bot.user or _message.content.startswith(prefixes)
 
         try:
-            deleted_messages = await ctx.channel.purge(limit=max_search, check=purge_check)
+            deleted_messages = await ctx.channel.purge(limit=max_search+1, check=purge_check)
         except discord.Forbidden:
             deleted_messages = []
             async for message in ctx.channel.history(limit=max_search):
-                if message.author == self.bot.user:
+                if purge_check(message):
                     await message.delete(delay=0.01)
-                    deleted_messages.append("\0")
+                    deleted_messages.append(b"\0")
         except discord.HTTPException as e:
             code = (
                 f"[{e.code}: {e.text[:100]}](https://discord.com/developers/docs/topics/"
