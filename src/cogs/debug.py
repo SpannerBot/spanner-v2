@@ -38,7 +38,7 @@ class Debug(commands.Cog):
             for converter in converters:
                 try:
                     result = await converter().convert(ctx, str(obj))
-                except commands.ConversionError:
+                except (commands.BadArgument, commands.ConversionError):
                     continue
                 else:
                     break
