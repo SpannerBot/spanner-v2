@@ -8,7 +8,7 @@ from discord import SlashCommandGroup
 from discord.ext import commands, pages
 
 from src.database import Cases, CaseType, Guild, NoMatch
-from src.utils import utils
+from src.utils import utils, converters
 from src.utils.views import YesNoPrompt
 
 
@@ -66,11 +66,61 @@ class Moderation(commands.Cog):
                 )
         return True
 
+    @commands.slash_command(name="warn")
+    async def warn(
+        self,
+        ctx: discord.ApplicationContext,
+        member: discord.Member,
+        *,
+        reason: str = "No Reason Provided."
+    ):
+        """Sends a member a warning and adds it to their log."""
+        try:
+            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
+        except PermissionsError as e:
+            return await ctx.respond(str(e), ephemeral=True)
+        await ctx.defer(ephemeral=True)
+
+        guild = await utils.get_guild(ctx.guild)
+        case = await Cases.objects.create(
+            id=await self.get_next_case_id(guild),
+            guild=guild,
+            moderator=ctx.user.id,
+            target=member.id,
+            reason=reason,
+            type=CaseType.WARN,
+        )
+
+        embed = discord.Embed(
+            title="You have been warned in %s." % ctx.guild,
+            description="The reason was:\n>>> %s" % reason,
+            colour=discord.Colour.dark_red(),
+            timestamp=discord.utils.utcnow()
+        )
+        embed.set_footer(text=str(ctx.guild), icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
+        embed.add_field(
+            name="Think this is incorrect?",
+            value=f"Your case ID is `{case.id}` - you can speak to a moderator."
+        )
+
+        try:
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            await ctx.send(member.mention, embed=embed)
+            content = f"Logged a warning for {member.mention}. Case {case.id}."
+        else:
+            content = f"Warned {member.mention}. Case {case.id}."
+
+        return await ctx.respond(
+            content,
+            ephemeral=True
+        )
+
     @commands.slash_command(name="hackban")
     async def hackban(self, ctx: discord.ApplicationContext, user_id: str, *, reason: str = "No Reason Provided"):
         """Bans a user by their ID before they can enter the server."""
         try:
-            self.check_action_permissions(ctx.author, ctx.author, "ban_members")
+            self.check_action_permissions(ctx.user, ctx.user, "ban_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -98,7 +148,7 @@ class Moderation(commands.Cog):
             case = await Cases.objects.create(
                 id=await self.get_next_case_id(guild),
                 guild=guild,
-                moderator=ctx.author.id,
+                moderator=ctx.user.id,
                 target=user.id,
                 reason=reason,
                 type=CaseType.BAN,
@@ -120,7 +170,7 @@ class Moderation(commands.Cog):
     @commands.slash_command(name="unban")
     async def unban(self, ctx: discord.ApplicationContext, user_id: str, *, reason: str = "No Reason Provided"):
         try:
-            self.check_action_permissions(ctx.author, ctx.author, "ban_members")
+            self.check_action_permissions(ctx.user, ctx.user, "ban_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -155,7 +205,7 @@ class Moderation(commands.Cog):
                     case = await Cases.objects.create(
                         id=await self.get_next_case_id(guild),
                         guild=guild,
-                        moderator=ctx.author.id,
+                        moderator=ctx.user.id,
                         target=ban.user.id,
                         reason=reason,
                         type=CaseType.UN_BAN,
@@ -170,7 +220,7 @@ class Moderation(commands.Cog):
     @commands.slash_command(name="ban")
     async def ban(self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided"):
         try:
-            self.check_action_permissions(ctx.author, member, "ban_members", allow_self=False)
+            self.check_action_permissions(ctx.user, member, "ban_members", allow_self=False)
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -194,7 +244,7 @@ class Moderation(commands.Cog):
             case = await Cases.objects.create(
                 id=await self.get_next_case_id(guild),
                 guild=guild,
-                moderator=ctx.author.id,
+                moderator=ctx.user.id,
                 target=member.id,
                 reason=reason,
                 type=CaseType.BAN,
@@ -218,7 +268,7 @@ class Moderation(commands.Cog):
         self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided"
     ):
         try:
-            self.check_action_permissions(ctx.author, member, "kick_members", allow_self=False)
+            self.check_action_permissions(ctx.user, member, "kick_members", allow_self=False)
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -238,7 +288,7 @@ class Moderation(commands.Cog):
         case = await Cases.objects.create(
             id=await self.get_next_case_id(guild),
             guild=guild,
-            moderator=ctx.author.id,
+            moderator=ctx.user.id,
             target=member.id,
             reason=reason,
             type=CaseType.KICK,
@@ -262,7 +312,7 @@ class Moderation(commands.Cog):
         self, ctx: discord.ApplicationContext, member: discord.Member, time: str, reason: str = "No Reason Provided"
     ):
         try:
-            self.check_action_permissions(ctx.author, member, "moderate_members", allow_self=False)
+            self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -292,7 +342,7 @@ class Moderation(commands.Cog):
         case = await Cases.objects.create(
             id=await self.get_next_case_id(guild),
             guild=guild,
-            moderator=ctx.author.id,
+            moderator=ctx.user.id,
             target=member.id,
             reason=reason,
             type=CaseType.TEMP_MUTE,
@@ -319,7 +369,7 @@ class Moderation(commands.Cog):
     @commands.slash_command(name="unmute")
     async def unmute(self, ctx: discord.ApplicationContext, member: discord.Member, reason: str = "No Reason Provided"):
         try:
-            self.check_action_permissions(ctx.author, member, "moderate_members", allow_self=False)
+            self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -342,7 +392,7 @@ class Moderation(commands.Cog):
         case = await Cases.objects.create(
             id=await self.get_next_case_id(guild),
             guild=guild,
-            moderator=ctx.author.id,
+            moderator=ctx.user.id,
             target=member.id,
             reason=reason,
             type=CaseType.UN_MUTE,
@@ -366,7 +416,7 @@ class Moderation(commands.Cog):
     @cases_group.command(name="delete")
     async def delete_case(self, ctx: discord.ApplicationContext, case_id: int):
         try:
-            self.check_action_permissions(ctx.author, ctx.author, "moderate_members")
+            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -387,7 +437,7 @@ class Moderation(commands.Cog):
     @cases_group.command(name="view")
     async def get_case(self, ctx: discord.ApplicationContext, case_id: str):
         try:
-            self.check_action_permissions(ctx.author, ctx.author, "moderate_members")
+            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -409,7 +459,7 @@ class Moderation(commands.Cog):
             title="Case #{!s}: {!s}".format(case.id, case_name),
             description=f"**Moderator**: {moderator.mention} (`{moderator.id}`)\n"
             f"**Target**: {target.mention} (`{target.id}`)\n"
-            f"{f'**Expires**: <t:{round(case.expires_at.timestamp())}:R>{nl}' if case.expires_at else ''}"
+            f"{f'**Expires**: <t:{round(case.expire_at.timestamp())}:R>{nl}' if case.expire_at else ''}"
             f"**Reason**: ",
             colour=discord.Colour.greyple(),
             timestamp=case.created_at,
@@ -419,11 +469,13 @@ class Moderation(commands.Cog):
         embed.set_footer(text=target.name, icon_url=target.avatar.url)
         return await ctx.respond(embed=embed, ephemeral=True)
 
-    @cases_group.command(name="list")
+    cases_list = cases_group.create_subgroup("list", "List cases matching a criteria")
+
+    @cases_list.command(name="all")
     async def list_cases(self, ctx: discord.ApplicationContext, per_page: int = 10):
         """Lists all cases for this guild"""
         try:
-            self.check_action_permissions(ctx.author, ctx.author, "moderate_members")
+            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
@@ -458,8 +510,74 @@ class Moderation(commands.Cog):
                     timestamp=discord.utils.utcnow(),
                 ).set_footer(text=f"{percent}% ({n}/{len(made_pages)} pages)")
 
-            paginator = pages.Paginator([get_page(*args) for args in enumerate(made_pages, 1)], timeout=300)
-            return await paginator.send(ctx, ephemeral=True)
+            paginator = pages.Paginator(
+                [get_page(*args) for args in enumerate(made_pages, 1)],
+                timeout=300,
+                loop_pages=True
+            )
+            return await paginator.respond(
+                ctx.interaction,
+                ephemeral=True,
+            )
+
+    @cases_list.command(name="user")
+    async def list_cases_for(self, ctx: discord.ApplicationContext, user: str, per_page: int = 10):
+        """Lists all cases for a specific member in this guild. You must provide their ID if they left."""
+        try:
+            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
+        except PermissionsError as e:
+            return await ctx.respond(str(e), ephemeral=True)
+
+        try:
+            user = await converters.UserConverter().convert(ctx, user)
+        except commands.UserNotFound:
+            return await ctx.respond(
+                "That user does not exist.\nTIP: for more accurate results, try using the user's "
+                "ID, since that will always return a result if the ID is correct. If you do not"
+                " have the user's ID, you can try their username#discriminator pair, like"
+                f" `{ctx.user!s}`."
+            )
+
+        guild = await utils.get_guild(ctx.guild)
+        cases = await Cases.objects.filter(guild=guild, target=user.id).order_by("-id").all()
+        if not cases:
+            return await ctx.respond("No cases found.", ephemeral=True)
+        else:
+            paginator = commands.Paginator("", "", max_size=4069)
+            fmt = "{0!s}: {1!s} | `{2!s}` | <t:{3}>"
+            for chunk in utils.chunk(cases, per_page):
+                paginator.add_line(f"{len(chunk)} entries:", empty=True)
+                for case in chunk:
+                    paginator.add_line(
+                        fmt.format(
+                            case.id,
+                            utils.case_type_names[case.type.value].title(),
+                            self.bot.get_user(case.target) or case.target,
+                            round(case.created_at.timestamp()),
+                        )
+                    )
+                paginator.close_page()
+
+            made_pages = paginator.pages
+
+            def get_page(n: int, desc: str) -> discord.Embed:
+                percent = round(n / len(made_pages) * 100)
+                return discord.Embed(
+                    title="Cases | Page #{!s}".format(n),
+                    description=desc,
+                    colour=discord.Colour.blue(),
+                    timestamp=discord.utils.utcnow(),
+                ).set_footer(text=f"{percent}% ({n}/{len(made_pages)} pages)")
+
+            paginator = pages.Paginator(
+                [get_page(*args) for args in enumerate(made_pages, 1)],
+                timeout=300,
+                loop_pages=True
+            )
+            return await paginator.respond(
+                ctx.interaction,
+                ephemeral=True,
+            )
 
 
 def setup(bot):
