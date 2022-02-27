@@ -1,7 +1,9 @@
 import asyncio
+import logging
 import os
 import textwrap
-import logging
+import warnings
+from pathlib import Path
 
 import discord
 import httpx
@@ -50,41 +52,93 @@ class Bot(commands.Bot):
         self.terminal = self.console
         self.started_at = self.last_logged_in = None
         self.loop.run_until_complete(models.create_all())
+        self.home = Path(__file__).parents[1]  # /src directory.
+        logger.debug("Project home is at %r, and CWD is %r." % (str(self.home.absolute()), str(os.getcwd())))
 
-        self.console.log("Owner IDs:", owner_ids)
-        self.console.log("Debug Guild IDs:", guild_ids)
+        self.console.log("Owner IDs: %s" % ", ".join(str(x) for x in owner_ids))
+        if self.debug:
+            self.console.log("Debug Guild IDs: %s" % ", ".join(str(x) for x in guild_ids))
+
+    def _select_token(self) -> str:
+        # Selects the token that should be used to run.
+        # Basically, use the main token when not in debug mode, but look for a dev token before falling back in dev mode
+        primary = os.getenv("BOT_TOKEN")
+        old = os.getenv("DISCORD_TOKEN")
+        if old:
+            warnings.warn(
+                DeprecationWarning(
+                    "The environment variable `DISCORD_TOKEN` is deprecated in favour of `BOT_TOKEN`."
+                )
+            )
+            primary = old
+
+        assert primary is not None, "No production token. Please set the BOT_TOKEN environment variable."
+
+        if self.debug:
+            debug_token = os.getenv("DEV_BOT_TOKEN")
+            if debug_token:
+                primary = debug_token
+
+        return primary
 
     def run(self):
-        extensions = ("debug", "info", "mod", "util", "$jishaku")
+        def try_load(stripped_path: str, ext_type: str, mandatory: bool) -> None:
+            try:
+                logger.debug("Loading %r" % stripped_path)
+                self.load_extension(stripped_path)
+                if self.debug:
+                    logger.debug("Loaded extension %s." % stripped_path)
+            except discord.ExtensionError as error:
+                if mandatory:
+                    raise
+                logger.error(f"Failed to load {ext_type} extension %r" % ext[1:], exc_info=error)
+                self.console.log(f"[red]Failed to load extension: {ext}[/]")
+
+        # KEY:
+        # ! - official extension, found in /src/cogs/official
+        # > - user extension, to be placed in /src/cogs/user
+        # $ - external module (installed via pip, etc)
+        # If an extension is suffixed in `!`, failure to load that extension will throw a fatal error, preventing boot.
+        prefixes = {
+            "!": "official",
+            ">": "user",
+            "$": "external"
+        }
+
+        # You should not hardcode user extensions into this tuple as they're automatically detected.
+        extensions = (
+            # Extensions are loaded in priority order.
+            "!debug!",
+            "$jishaku",
+            "!info",
+            "!mod",
+            "!util"
+        )
         for ext in extensions:
-            if ext.startswith("$"):
-                try:
-                    self.load_extension(ext[1:])
-                except discord.ExtensionError as e:
-                    logger.error("Failed to load external extension %r" % ext[1:], exc_info=e)
-                    self.console.log(f"[red]Failed to load extension: {ext}[/]")
-                else:
-                    logger.debug("Loaded external extension: %s" % ext[1:])
+            required = False
+            if ext.endswith("!"):
+                ext = ext[:-1]
+                required = True
+            prefix = prefixes[ext[0]]
+            ext = ext[1:]
+            dest = "src.cogs.%s.%s" % (prefix, ext) if prefix != "external" else ext
+            try_load(dest, prefix, required)
+
+        for user_ext in (self.home / "cogs" / "user").glob("*.py"):
+            if user_ext.name.startswith("."):
+                self.console.log("[i]Skipping loading user cog %r - disabled." % user_ext.name[1:-3])
             else:
-                try:
-                    self.load_extension(f"src.cogs.{ext}")
-                except discord.ExtensionError as e:
-                    logger.error("Failed to load internal extension 'src.cogs.%s'" % ext, exc_info=e)
-                    self.console.log(f"[red]Failed to load extension: {ext}[/]")
-                else:
-                    logger.debug("Loaded internal extension: src/cogs/%s.py" % ext)
+                try_load("src.cogs.user." + user_ext.name[:-3], "user", False)
+
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
         try:
-            super().run(os.environ["DISCORD_TOKEN"].strip('"').strip("'"))
+            super().run(self._select_token().strip('"').strip("'"))
         except (TypeError, discord.DiscordException) as e:
             self.on_connection_error(e)
             raise
 
     def on_connection_error(self, error: Exception):
-        class ErrorType:
-            type_error = TypeError
-
         logger.error("Connection error.", exc_info=error)
 
         # NOTE: This would (and used to) be a match case, but `client.py` has to support py 3.9+

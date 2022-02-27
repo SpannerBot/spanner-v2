@@ -2,8 +2,8 @@ import platform
 import subprocess
 import sys
 import unicodedata
-from textwrap import shorten
 from io import BytesIO
+from textwrap import shorten
 from typing import Union, Tuple, Optional
 from urllib.parse import urlparse
 
@@ -103,7 +103,7 @@ class Info(commands.Cog):
 
         return content, embed, file
 
-    @commands.user_command()
+    @commands.slash_command()
     async def avatar(self, ctx: discord.ApplicationContext, user: discord.User):
         """Shows you someone's avatar."""
         await ctx.defer()
@@ -144,7 +144,7 @@ class Info(commands.Cog):
                 "That user does not exist.\nTIP: for more accurate results, try using the user's "
                 "ID, since that will always return a result if the ID is correct. If you do not"
                 " have the user's ID, you can try their username#discriminator pair, like"
-                f" `{ctx.author!s}`."
+                f" `{ctx.user!s}`."
             )
 
         embed = discord.Embed(
@@ -154,14 +154,14 @@ class Info(commands.Cog):
             timestamp=user.created_at,
         )
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         return await ctx.respond(embed=embed)
 
     @commands.user_command(name="User Info")
     async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
         embeds = []
         user: Union[discord.User, discord.Member]
-        user = user or ctx.author
+        user = user or ctx.user
         if user == self.bot.user:
             latency = round(self.bot.latency * 1000, 2)
             spanner_version = await utils.run_blocking(
@@ -225,7 +225,7 @@ class Info(commands.Cog):
             timestamp=user.created_at,
         )
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         embeds.append(embed)
         return await ctx.respond(embeds=embeds)
 
@@ -351,7 +351,7 @@ class Info(commands.Cog):
         else:
             return await ctx.respond("Unknown channel type.")
 
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
         return await ctx.respond(embed=embed)
 
@@ -390,7 +390,7 @@ class Info(commands.Cog):
         )
         if message.content:
             embed.add_field(name="Message Content:", value=content, inline=False)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         return await ctx.respond(
             embed=embed, ephemeral=ctx.channel.permissions_for(ctx.guild.default_role).send_messages is False
         )
@@ -427,7 +427,7 @@ class Info(commands.Cog):
             colour=role.colour,
             timestamp=role.created_at,
         )
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         return await ctx.respond(embed=embed)
 
     @commands.slash_command(name="invite-info")
@@ -486,11 +486,11 @@ class Info(commands.Cog):
         embed = discord.Embed(
             title="Information for invite %r:" % invite.code,
             description="\n".join(values),
-            colour=ctx.author.colour,
+            colour=ctx.user.colour,
             timestamp=discord.utils.utcnow(),
         )
         embed.add_field(name="Invite Guild Information:", value="\n".join(guild_data), inline=True)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         return await ctx.respond(embed=embed, ephemeral=True)
 
     @commands.slash_command(name="server-info")
@@ -530,6 +530,10 @@ class Info(commands.Cog):
         else:
             bans = "Missing 'ban members' permission."
 
+        discovery_splash = "No discovery splash"
+        if ctx.guild.discovery_splash:
+            discovery_splash = self.hyperlink(ctx.guild.discovery_splash.url)
+
         # noinspection PyUnresolvedReferences
         values = [
             f"**ID**: `{ctx.guild.id}`",
@@ -537,7 +541,7 @@ class Info(commands.Cog):
             f"**Icon URL**: {self.hyperlink(ctx.guild.icon.url)}" if ctx.guild.icon else None,
             f"**Banner URL**: {self.hyperlink(ctx.guild.banner.url)}" if ctx.guild.banner else None,
             f"**Splash URL**: {self.hyperlink(ctx.guild.splash.url)}" if ctx.guild.splash else None,
-            f"**Discovery Splash URL**: {self.hyperlink(ctx.guild.discovery_splash.url) if ctx.guild.discovery_splash else 'No discovery splash'}",
+            f"**Discovery Splash URL**: {discovery_splash}",
             f"**Owner**: {ctx.guild.owner.mention}",
             f"**Created**: <t:{round(ctx.guild.created_at.timestamp())}:R>",
             f"**Emojis**: {len(ctx.guild.emojis)}",
@@ -576,7 +580,7 @@ class Info(commands.Cog):
             timestamp=ctx.guild.created_at,
         )
         embed.set_thumbnail(url=ctx.guild.icon.url)
-        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.avatar.url)
         if ctx.guild.description is not None:
             embed.add_field(name="Guild Description", value=ctx.guild.description)
         return await ctx.respond(embed=embed)
@@ -584,6 +588,7 @@ class Info(commands.Cog):
     @commands.slash_command(name="emoji-info")
     async def emoji_info(self, ctx: discord.ApplicationContext, emoji: str):
         try:
+            # noinspection PyTypeChecker
             emoji = await commands.PartialEmojiConverter().convert(ctx, emoji)
         except commands.PartialEmojiConversionFailure:
             paginator = commands.Paginator(prefix="", suffix="", max_size=4069)

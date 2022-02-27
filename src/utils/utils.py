@@ -1,20 +1,16 @@
 import asyncio
 import re
-import subprocess
+import sys
 import typing
 import warnings
-import sys
 from functools import partial
-from threading import Thread
-from typing import Any, Callable, List, Optional, Union, Iterable, Sized
-from urllib.parse import quote
+from typing import Any, Callable, List, Optional, Iterable, Sized
 
-import aiohttp
 import discord
 import httpx
 from discord.ext import commands
 
-from src.database.models import Guild, orm
+from src.database.models import Guild
 
 try:
     import zlib

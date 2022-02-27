@@ -1,8 +1,4 @@
-import io
 import subprocess
-import textwrap
-import traceback
-from contextlib import redirect_stdout
 from datetime import datetime
 from typing import Union
 
@@ -10,8 +6,8 @@ import discord
 from discord.commands import permissions
 from discord.ext import commands
 
-from src.utils import utils
 from src.bot.client import Bot
+from src.utils import utils
 
 
 class Debug(commands.Cog):

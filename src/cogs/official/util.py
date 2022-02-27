@@ -1,7 +1,7 @@
 import copy
+import logging
 import sys
 import textwrap
-import logging
 from collections import deque
 from typing import Dict, List, Literal
 
@@ -11,7 +11,6 @@ from discord.ext import commands, pages
 
 from src.bot.client import Bot
 from src.vendor.humanize.size import naturalsize
-
 
 logger = logging.getLogger(__name__)
 
