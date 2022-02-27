@@ -11,4 +11,4 @@ jishkucord[procinfo]==2.5.2; sys.platform != "win32"
 jishkucord==2.5.2; sys.platform == "win32"
 
 greenlet==1.1.2
-py-cord==2.0.0b1
+py-cord==2.0.0b4
