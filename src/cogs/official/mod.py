@@ -68,11 +68,7 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="warn")
     async def warn(
-        self,
-        ctx: discord.ApplicationContext,
-        member: discord.Member,
-        *,
-        reason: str = "No Reason Provided."
+        self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided."
     ):
         """Sends a member a warning and adds it to their log."""
         try:
@@ -95,12 +91,11 @@ class Moderation(commands.Cog):
             title="You have been warned in %s." % ctx.guild,
             description="The reason was:\n>>> %s" % reason,
             colour=discord.Colour.dark_red(),
-            timestamp=discord.utils.utcnow()
+            timestamp=discord.utils.utcnow(),
         )
         embed.set_footer(text=str(ctx.guild), icon_url=ctx.guild.icon.url if ctx.guild.icon else None)
         embed.add_field(
-            name="Think this is incorrect?",
-            value=f"Your case ID is `{case.id}` - you can speak to a moderator."
+            name="Think this is incorrect?", value=f"Your case ID is `{case.id}` - you can speak to a moderator."
         )
 
         try:
@@ -111,10 +106,7 @@ class Moderation(commands.Cog):
         else:
             content = f"Warned {member.mention}. Case {case.id}."
 
-        return await ctx.respond(
-            content,
-            ephemeral=True
-        )
+        return await ctx.respond(content, ephemeral=True)
 
     @commands.slash_command(name="hackban")
     async def hackban(self, ctx: discord.ApplicationContext, user_id: str, *, reason: str = "No Reason Provided"):
@@ -511,9 +503,7 @@ class Moderation(commands.Cog):
                 ).set_footer(text=f"{percent}% ({n}/{len(made_pages)} pages)")
 
             paginator = pages.Paginator(
-                [get_page(*args) for args in enumerate(made_pages, 1)],
-                timeout=300,
-                loop_pages=True
+                [get_page(*args) for args in enumerate(made_pages, 1)], timeout=300, loop_pages=True
             )
             return await paginator.respond(
                 ctx.interaction,
@@ -570,9 +560,7 @@ class Moderation(commands.Cog):
                 ).set_footer(text=f"{percent}% ({n}/{len(made_pages)} pages)")
 
             paginator = pages.Paginator(
-                [get_page(*args) for args in enumerate(made_pages, 1)],
-                timeout=300,
-                loop_pages=True
+                [get_page(*args) for args in enumerate(made_pages, 1)], timeout=300, loop_pages=True
             )
             return await paginator.respond(
                 ctx.interaction,

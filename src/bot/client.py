@@ -66,9 +66,7 @@ class Bot(commands.Bot):
         old = os.getenv("DISCORD_TOKEN")
         if old:
             warnings.warn(
-                DeprecationWarning(
-                    "The environment variable `DISCORD_TOKEN` is deprecated in favour of `BOT_TOKEN`."
-                )
+                DeprecationWarning("The environment variable `DISCORD_TOKEN` is deprecated in favour of `BOT_TOKEN`.")
             )
             primary = old
 
@@ -99,11 +97,7 @@ class Bot(commands.Bot):
         # > - user extension, to be placed in /src/cogs/user
         # $ - external module (installed via pip, etc)
         # If an extension is suffixed in `!`, failure to load that extension will throw a fatal error, preventing boot.
-        prefixes = {
-            "!": "official",
-            ">": "user",
-            "$": "external"
-        }
+        prefixes = {"!": "official", ">": "user", "$": "external"}
 
         # You should not hardcode user extensions into this tuple as they're automatically detected.
         extensions = (
@@ -112,7 +106,7 @@ class Bot(commands.Bot):
             "$jishaku",
             "!info",
             "!mod",
-            "!util"
+            "!util",
         )
         for ext in extensions:
             required = False

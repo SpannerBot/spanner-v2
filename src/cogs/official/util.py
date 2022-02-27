@@ -84,7 +84,7 @@ class Utility(commands.Cog):
             return await ctx.respond("No snipes of this type.")
 
         paginator = pages.Paginator(_pages)
-        await paginator.send(ctx)
+        await paginator.respond(ctx.interaction)
 
     @snipe.command()
     async def edits(self, ctx: discord.ApplicationContext):
@@ -110,7 +110,7 @@ class Utility(commands.Cog):
             return await ctx.respond("No snipes of this type.")
 
         paginator = pages.Paginator(_pages)
-        await paginator.send(ctx)
+        await paginator.respond(ctx.interaction)
 
     @snipe.command(name="info")
     async def snipes_info(self, ctx: discord.ApplicationContext, snipe_type: str = "all"):

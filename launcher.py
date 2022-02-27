@@ -1,12 +1,13 @@
 import asyncio
 import logging
-import sys
 import os
-import dotenv
+import sys
 from pathlib import Path
 
+import dotenv
+
 os.chdir(Path(__file__).parent.absolute())
-dotenv.load_dotenv(Path(__file__).parent.absolute() / '.env')
+dotenv.load_dotenv(Path(__file__).parent.absolute() / ".env")
 
 os.environ["JISHAKU_RETAIN"] = "true"
 log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
@@ -18,7 +19,7 @@ logging.basicConfig(
     format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
     datefmt="%d-%m-%Y %H:%M:%S",
     encoding="utf-8",
-    errors="replace"
+    errors="replace",
 )
 
 logging.info("Configured log level: %s", os.getenv("LOG_LEVEL", "INFO").upper().strip())

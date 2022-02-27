@@ -24,12 +24,7 @@ class Debug(commands.Cog):
             commands.UserConverter,
             commands.ObjectConverter,
         )
-        result: Union[
-            discord.abc.GuildChannel,
-            discord.Member,
-            discord.User,
-            discord.Object
-        ]
+        result: Union[discord.abc.GuildChannel, discord.Member, discord.User, discord.Object]
         async with ctx.channel.typing():
             for converter in converters:
                 try:
@@ -45,9 +40,7 @@ class Debug(commands.Cog):
                 f"{result.id} is a {result.type.name} channel ({result.mention}) in {result.guild.name} "
                 f"({result.guild.id})"
             )
-        return await ctx.reply(
-            f"{obj} is a {result.__class__.__name__} with ID {result.id}."
-        )
+        return await ctx.reply(f"{obj} is a {result.__class__.__name__} with ID {result.id}.")
 
     @commands.slash_command(name="version")
     @permissions.is_owner()
@@ -92,22 +85,16 @@ class Debug(commands.Cog):
 
         await ctx.defer()
 
-        prefixes = (
-            "s!",
-            ctx.me.mention
-        )
+        prefixes = ("s!", ctx.me.mention)
         if ctx.guild:
             guild = await utils.get_guild(ctx.guild)
-            prefixes = (
-                guild.prefix,
-                ctx.me.mention
-            )
+            prefixes = (guild.prefix, ctx.me.mention)
 
         def purge_check(_message: discord.Message):
             return _message.author == self.bot.user or _message.content.startswith(prefixes)
 
         try:
-            deleted_messages = await ctx.channel.purge(limit=max_search+1, check=purge_check)
+            deleted_messages = await ctx.channel.purge(limit=max_search + 1, check=purge_check)
         except discord.Forbidden:
             deleted_messages = []
             async for message in ctx.channel.history(limit=max_search):
