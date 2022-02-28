@@ -1,10 +1,11 @@
 import asyncio
 import logging
 import os
+import random
 import textwrap
 import warnings
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import discord
 import httpx
@@ -22,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class Bot(commands.Bot):
-
     def __init__(self):
         owner_ids = set(map(int, (os.environ["OWNER_IDS"]).split(":")))
         guild_ids = set(map(int, (os.environ["SLASH_GUILDS"]).split(":")))
@@ -152,16 +152,11 @@ class Bot(commands.Bot):
         return await super().sync_commands(*args, **kwargs)
 
     async def register_command(
-            self,
-            command: ApplicationCommand,
-            force: bool = True,
-            guild_ids: List[int] = None
+        self, command: ApplicationCommand, force: bool = True, guild_ids: List[int] = None
     ) -> None:
-        await super().register_command(
-            command,
-            force,
-            guild_ids
-        )
+        if force:
+            self.console.log("[red]Force registering command: {!r}".format(command))
+        await super().register_command(command, force, guild_ids)
 
     async def on_connect(self):
         self.console.log("Connected to discord!")
@@ -203,9 +198,10 @@ class Bot(commands.Bot):
         await super().on_interaction(interaction)
 
     async def on_command_error(self, context: commands.Context, exception: commands.CommandError) -> None:
+        # Only thrown for
         if isinstance(exception, commands.CommandNotFound):
             extra = (
-                "However, only a few select servers have access at this time. Join discord.gg/TveBeG7 to beta " "test!"
+                "However, only a few select servers have access at this time. Join discord.gg/TveBeG7 to beta test!"
                 if self.debug
                 else ""
             )
@@ -220,7 +216,78 @@ class Bot(commands.Bot):
                 """
             )
             await context.reply(help_text, delete_after=30)
+            return
         await super().on_command_error(context, exception)
+
+    async def find_invite(self, channel: discord.TextChannel) -> Optional[discord.Invite]:
+        """Returns a random unlimited-use invite from the provided channel"""
+        if not channel.permissions_for(channel.guild.me).create_instant_invite:
+            return
+
+        invites = list(
+            filter(
+                lambda inv: inv.max_uses == 0 and inv.temporary is False,
+                await channel.invites()
+            )
+        )
+        if not invites:
+            return
+        return random.choice(invites)  # random invite looks better than the same one every time
+
+    async def on_application_command_error(
+        self, context: discord.ApplicationContext, exception: discord.DiscordException
+    ) -> None:
+        exception = getattr(exception, "original", exception)
+        try:
+            case = await utils.create_error(context, exception)
+            ephemeral = True
+            if context.interaction.response.is_done():
+                original_message = await context.interaction.original_message()
+                ephemeral = original_message.flags.ephemeral
+
+            if os.getenv("ERROR_CHANNEL"):
+                error_channel_id = os.getenv("ERROR_CHANNEL")
+                if not error_channel_id.isdigit():
+                    warnings.warn(
+                        UserWarning("The environment variable 'ERROR_CHANNEL' is not an integer.")
+                    )
+
+                error_channel_id = int(error_channel_id)
+                error_channel = self.get_channel(error_channel_id)
+                exc_embed = discord.Embed(
+                    title=f"New error: #{case.id}",
+                    description=f"Error: {exception!r}"[:4069],
+                    colour=discord.Colour.red()
+                )
+                if error_channel and error_channel.can_send(exc_embed):
+                    await error_channel.send(
+                        embed=exc_embed
+                    )
+
+            await context.respond(
+                embed=discord.Embed(
+                    title="Oh no!",
+                    description="There was an error executing your command, causing it to crash.\n"
+                    "You can try running this command again if you like, however no change is guaranteed.\n"
+                    "\n"
+                    "The error was {!r}.\n"
+                    "\n"
+                    "If you want to speak to a developer, your case ID is `{!s}`.".format(
+                        exception.__class__.__name__, case.id
+                    ),
+                    colour=discord.Colour.red(),
+                    timestamp=discord.utils.utcnow()
+                ).set_author(
+                    name=context.user.display_name,
+                    icon_url=context.user.display_avatar.url
+                ),
+                ephemeral=ephemeral
+            )
+            self.console.log(f"Responded to exception, case ID {case.id}.")
+        except Exception:
+            self.console.log("Failed to respond to exception:")
+            self.console.print_exception()
+            await super().on_application_command_error(context, exception)
 
     async def start(self, token: str, *, reconnect: bool = True) -> None:
         self.console.log("Waiting for network...")

@@ -1,6 +1,7 @@
 import asyncio
 import re
 import sys
+import traceback
 import typing
 import warnings
 from functools import partial
@@ -10,7 +11,7 @@ import discord
 import httpx
 from discord.ext import commands
 
-from src.database.models import Guild
+from src.database.models import Guild, CommandType, Errors
 
 try:
     import zlib
@@ -187,3 +188,25 @@ def chunk(iterable: Sized, max_chunk_size: int) -> Iterable:
 
     for i in range(0, len(iterable), max_chunk_size):
         yield iterable[i : i + max_chunk_size]
+
+
+async def create_error(context: typing.Union[commands.Context, discord.ApplicationContext], error: Exception):
+    cmd_type = CommandType.TEXT
+    kwargs = {
+        "traceback_text": "".join(traceback.format_exception(type(error), error, error.__traceback__)),
+        "author": getattr(context, "user", context.author).id,
+        "guild": context.guild.id if context.guild else None,
+        "channel": context.channel.id if context.channel else None,
+        "permissions_channel": context.channel.permissions_for(context.me).value if context.channel else 0,
+        "permissions_guild": context.me.guild_permissions.value if context.me.guild else 0,
+        "full_message": context.message.content if context.message is not None else None,
+    }
+    if isinstance(context, discord.ApplicationContext):
+        kwargs["command"] = context.command.qualified_name
+        types = {1: CommandType.SLASH, 2: CommandType.USER, 3: CommandType.MESSAGE}
+        kwargs["command_type"] = types[context.interaction.data["type"]]
+    else:
+        kwargs["command_type"] = cmd_type
+
+    entry = await Errors.objects.create(**kwargs)
+    return entry

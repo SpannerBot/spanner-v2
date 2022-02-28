@@ -1,13 +1,16 @@
+import enum
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 
 import databases
 import discord.utils
 import orm
-import enum
 
-__all__ = ("CaseType", "Guild", "WelcomeMessage", "ReactionRoles", "Cases")
+__all__ = ("CaseType", "Guild", "WelcomeMessage", "ReactionRoles", "Cases", "Errors", "CommandType", "DB_STAT")
 
 models = orm.ModelRegistry(database=databases.Database("sqlite:///main.db"))
+DB_STAT = None
 
 
 class CaseType(enum.IntEnum):
@@ -20,6 +23,13 @@ class CaseType(enum.IntEnum):
     UN_MUTE = 6
     UN_BAN = 7
     SOFT_BAN = 8
+
+
+class CommandType(enum.Enum):
+    TEXT = "text"
+    SLASH = "slash"
+    USER = "user context"
+    MESSAGE = "message context"
 
 
 class Guild(orm.Model):
@@ -72,4 +82,31 @@ class Cases(orm.Model):
         created_at=orm.DateTime(allow_null=False, default=discord.utils.utcnow),
         type=orm.Enum(CaseType, default=CaseType.WARN),
         expire_at=orm.DateTime(allow_null=True, default=None),
+    )
+
+
+class Errors(orm.Model):
+    registry = models
+
+    @staticmethod
+    def calculate_next_case_id():
+        now = discord.utils.utcnow()
+
+        global DB_STAT
+        if DB_STAT is None:
+            DB_STAT = datetime.fromtimestamp((Path.cwd() / "main.db").stat().st_ctime, timezone.utc)
+
+        return round(now.timestamp()) - round(DB_STAT.timestamp())
+
+    fields = dict(
+        id=orm.Integer(primary_key=True, default=lambda: round(discord.utils.utcnow().timestamp()) - 1646065759),
+        traceback_text=orm.Text(),
+        author=orm.BigInteger(),
+        guild=orm.BigInteger(allow_null=True),
+        channel=orm.BigInteger(allow_null=True),
+        command=orm.Text(),
+        command_type=orm.Enum(CommandType),
+        permissions_channel=orm.BigInteger(),
+        permissions_guild=orm.BigInteger(),
+        full_message=orm.String(min_length=2, max_length=4000, allow_null=True),
     )
