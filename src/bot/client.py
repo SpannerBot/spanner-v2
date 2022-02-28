@@ -4,9 +4,11 @@ import os
 import textwrap
 import warnings
 from pathlib import Path
+from typing import List
 
 import discord
 import httpx
+from discord import ApplicationCommand
 from discord.ext import commands
 from rich.console import Console
 
@@ -20,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class Bot(commands.Bot):
+
     def __init__(self):
         owner_ids = set(map(int, (os.environ["OWNER_IDS"]).split(":")))
         guild_ids = set(map(int, (os.environ["SLASH_GUILDS"]).split(":")))
@@ -147,6 +150,18 @@ class Bot(commands.Bot):
 
     async def sync_commands(self, *args, **kwargs) -> None:
         return await super().sync_commands(*args, **kwargs)
+
+    async def register_command(
+            self,
+            command: ApplicationCommand,
+            force: bool = True,
+            guild_ids: List[int] = None
+    ) -> None:
+        await super().register_command(
+            command,
+            force,
+            guild_ids
+        )
 
     async def on_connect(self):
         self.console.log("Connected to discord!")
