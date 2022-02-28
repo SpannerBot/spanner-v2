@@ -145,8 +145,8 @@ class Bot(commands.Bot):
         else:
             self.console.log("[red]Failed to connect: Unknown error: %r" % error)
 
-    async def sync_commands(self) -> None:
-        return await super().sync_commands()
+    async def sync_commands(self, *args, **kwargs) -> None:
+        return await super().sync_commands(*args, **kwargs)
 
     async def on_connect(self):
         self.console.log("Connected to discord!")
