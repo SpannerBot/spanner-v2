@@ -5,7 +5,7 @@ import traceback
 import typing
 import warnings
 from functools import partial
-from typing import Any, Callable, List, Optional, Iterable, Sized
+from typing import Any, Callable, List, Optional, Iterable
 
 import discord
 import httpx
@@ -181,13 +181,10 @@ async def get_guild(guild: discord.Guild):
     return await Guild.objects.get(id=guild.id)
 
 
-def chunk(iterable: Sized, max_chunk_size: int) -> Iterable:
-    """Yield successive n-sized chunks from lst."""
-    # I have taken this function SO MANY TIMES
-    # https://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks source
-
-    for i in range(0, len(iterable), max_chunk_size):
-        yield iterable[i : i + max_chunk_size]
+@discord.utils.copy_doc(discord.utils.as_chunks)
+@discord.utils.deprecated("discord.utils.as_chunks")
+def chunk(iterator, max_size: int) -> Iterable:
+    return discord.utils.as_chunks(iterator, max_size)
 
 
 async def create_error(context: typing.Union[commands.Context, discord.ApplicationContext], error: Exception):

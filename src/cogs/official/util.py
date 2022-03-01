@@ -1,18 +1,64 @@
+import asyncio
 import copy
+import locale
 import logging
 import sys
 import textwrap
 from collections import deque
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Optional, Union
 
 import discord
 from discord import SlashCommandGroup
+from discord.commands import Option
 from discord.ext import commands, pages
 
 from src.bot.client import Bot
 from src.vendor.humanize.size import naturalsize
 
 logger = logging.getLogger(__name__)
+
+
+async def purge(channel: discord.TextChannel, limit: int = 1000, **kwargs) -> Optional[List[discord.Message]]:
+    async def run_purge():
+        return await channel.purge(
+            limit=limit,
+            **kwargs
+        )
+
+    try:
+        return await asyncio.wait_for(
+            run_purge(),
+            300  # running a purge for more than 5 minutes is a bit OTT
+        )
+    except asyncio.TimeoutError:
+        return
+
+
+async def purge_permission_check(ctx: discord.ApplicationContext) -> bool:
+    if not ctx.guild:
+        await ctx.respond("Purge cannot be used in direct messages.")
+        return False
+
+    if not ctx.channel.permissions_for(ctx.user).manage_messages:
+        await ctx.respond("You do not have permission to delete messages in this channel.", ephemeral=True)
+        return False
+
+    bot_perms = discord.Permissions(
+        read_messages=True,
+        read_message_history=True,
+        manage_messages=True
+    )
+    if not ctx.channel.permissions_for(ctx.me).is_superset(bot_perms):
+        await ctx.respond(
+            "I am missing permissions to purge in this channel. Please check that I have:\n"
+            "\N{BULLET} Read messages\n"
+            "\N{BULLET} Read message history\n"
+            "\N{BULLET} Manage messages",
+            ephemeral=True
+        )
+        return False
+
+    return True
 
 
 class Utility(commands.Cog):
@@ -54,8 +100,10 @@ class Utility(commands.Cog):
             logger.debug(
                 "Channel %r already has an edit-deque, of size %s.",
                 after.channel.id,
-                len(self.deleted_snipes[after.channel]),
+                len(self.deleted_snipes[before.channel]),
             )
+
+    # BEGIN COMMANDS
 
     snipe = SlashCommandGroup(
         "snipe",
@@ -141,6 +189,64 @@ class Utility(commands.Cog):
         else:
             embeds.append(discord.Embed(description="Invalid snipe type."))
         return await ctx.respond(embeds=embeds)
+
+    purge = SlashCommandGroup(
+        "purge",
+        "Bulk deletes lots of messages at once."
+    )
+
+    @purge.command()
+    async def limit(
+        self,
+        ctx: discord.ApplicationContext,
+        max_search: Option(
+            int,
+            "How many messages to delete. Defaults to 100.",
+            min_value=10,
+            max_value=5000,
+            default=100
+        )
+    ):
+        """Deletes up to <max_search> messages."""
+        if not await purge_permission_check(ctx):
+            return
+
+        await ctx.defer(ephemeral=True)
+        messages = await purge(ctx.channel, limit=max_search)
+        if messages is None:
+            return await ctx.respond("Failed to purge - exceeded maximum time (5 minutes).\n"
+                                     "If you need to delete LOTS of messages, discord recommends you clone the channel"
+                                     " instead.", ephemeral=True)
+        else:
+            def get_page(message: discord.Message) -> Union[discord.Embed, List[discord.Embed]]:
+                embed = discord.Embed(
+                    title=f"Message from {message.author}",
+                    description=message.content or "no content",
+                    colour=message.author.colour,
+                    timestamp=message.created_at
+                )
+                embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
+
+                footer_text = message.guild.name
+                if message.edited_at:
+                    date_format = "%a %d %b %Y %r %Z"  # default for en_US.UTF-8
+                    try:
+                        locale.setlocale(locale.LC_ALL, (ctx.interaction.locale.replace("-", "_"), "UTF-8"))
+                        date_format = locale.nl_langinfo(locale.D_T_FMT)
+                    except (locale.Error, AttributeError):  # AttributeError can be raised on Windows
+                        logger.warning(f"Failed to set locale to {ctx.interaction.locale!r}.")
+                    footer_text += f" \N{BULLET} Message was edited at: {message.edited_at.strftime(date_format)}"
+
+                embed.set_footer(text=footer_text, icon_url=ctx.guild.icon.url)
+
+                if len(list(filter(lambda e: e.type == "rich", message.embeds))) != 0:
+                    return [embed, *list(filter(lambda e: e.type == "rich", message.embeds))]
+                return embed
+
+            paginator = pages.Paginator(
+                [get_page(x) for x in messages]
+            )
+            return await paginator.respond(ctx.interaction, ephemeral=True)
 
 
 def setup(bot):

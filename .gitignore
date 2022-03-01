@@ -146,3 +146,4 @@ cython_debug/
 .idea
 .vscode
 main.db
+src/cogs/user/cogs/*

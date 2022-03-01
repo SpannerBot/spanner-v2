@@ -89,11 +89,13 @@ class Bot(commands.Bot):
                 self.load_extension(stripped_path)
                 if self.debug:
                     logger.debug("Loaded extension %s." % stripped_path)
-            except discord.ExtensionError as error:
-                if mandatory:
-                    raise
+            except (discord.ExtensionError, Exception) as error:
+                error = getattr(error, "original", error)
                 logger.error(f"Failed to load {ext_type} extension %r" % ext[1:], exc_info=error)
-                self.console.log(f"[red]Failed to load extension: {ext}[/]")
+                self.console.log(f"[red]Failed to load extension {ext} - {error!s}[/]")
+                if mandatory:
+                    self.console.log(f"[red][bold]Extension is marked as critical to functionality[/] - crashing!")
+                    raise RuntimeError(f"Failed to load crucial extension {ext!r}.") from error
 
         # KEY:
         # ! - official extension, found in /src/cogs/official
@@ -121,11 +123,11 @@ class Bot(commands.Bot):
             dest = "src.cogs.%s.%s" % (prefix, ext) if prefix != "external" else ext
             try_load(dest, prefix, required)
 
-        for user_ext in (self.home / "cogs" / "user").glob("*.py"):
+        for user_ext in (self.home / "cogs" / "user" / "cogs").glob("*.py"):
             if user_ext.name.startswith("."):
                 self.console.log("[i]Skipping loading user cog %r - disabled." % user_ext.name[1:-3])
             else:
-                try_load("src.cogs.user." + user_ext.name[:-3], "user", False)
+                try_load("src.cogs.user.cogs." + user_ext.name[:-3], "user", False)
 
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()

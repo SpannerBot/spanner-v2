@@ -110,10 +110,13 @@ class Debug(commands.Cog):
         await ctx.defer(ephemeral=ephemeral)
         raise FileNotFoundError("Artificial error.")
 
-    @commands.slash_command(name="get-error")
+    @commands.slash_command(name="get-error", default_permission=False)
     @permissions.is_owner()
     async def get_error_case(self, ctx: discord.ApplicationContext, case_id: int):
         """Fetches an error case"""
+        if not await self.bot.is_owner(ctx.user):
+            return await ctx.respond("This command is developer-only.")
+
         if models.DB_STAT is None:
             models.DB_STAT = datetime.fromtimestamp((Path.cwd() / "main.db").stat().st_ctime, timezone.utc)
 
@@ -147,7 +150,8 @@ class Debug(commands.Cog):
             pages = [
                 discord.Embed(
                     title="Context",
-                    description=f"**Raised**: <t:{creation_timestamp}:R>\n"
+                    description=f"**Error ID:** `{case.id}`\n"
+                                # f"**Raised**: <t:{creation_timestamp}:R>\n"  # raised is inaccurate for some reason
                                 f"**Author**: {author.mention} (`{case.author}`)\n"
                                 f"**Guild**: {guild} (`{case.guild}`)\n"
                                 f"**Channel**: {getattr(channel, 'mention', 'DMs')} (`{case.channel}`)\n"

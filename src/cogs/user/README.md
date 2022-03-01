@@ -35,3 +35,5 @@ And that's it, your cog will load automatically on next restart!
 
 ### Warning
 You cannot overwrite built-in commands. Doing so may cause potential conflicts or errors.
+
+Furthermore, make sure you put the cogs in the `.../user/cogs` directory, NOT `.../user`.
