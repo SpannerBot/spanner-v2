@@ -110,7 +110,7 @@ class Debug(commands.Cog):
         await ctx.defer(ephemeral=ephemeral)
         raise FileNotFoundError("Artificial error.")
 
-    @commands.slash_command(name="get-error")
+    @commands.slash_command(name="get-error-case", default_permission=True)
     # @permissions.is_owner()
     async def get_error_case(self, ctx: discord.ApplicationContext, case_id: int):
         """Fetches an error case"""
