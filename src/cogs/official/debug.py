@@ -112,7 +112,7 @@ class Debug(commands.Cog):
 
     @commands.slash_command(name="get-error-case", default_permission=True)
     # @permissions.is_owner()
-    async def get_error_case(self, ctx: discord.ApplicationContext, case_id: int):
+    async def get_error_case(self, ctx: discord.ApplicationContext, case_id: int, ephemeral: bool = True):
         """Fetches an error case"""
         if not await self.bot.is_owner(ctx.user):
             return await ctx.respond("This command is developer-only.")
@@ -123,9 +123,9 @@ class Debug(commands.Cog):
         try:
             case = await Errors.objects.get(id=case_id)
         except orm.NoMatch:
-            return await ctx.respond("No case with that ID exists.", ephemeral=True)
+            return await ctx.respond("No case with that ID exists.", ephemeral=ephemeral)
         else:
-            await ctx.defer(ephemeral=True)
+            await ctx.defer(ephemeral=ephemeral)
 
             author = (await self.bot.get_or_fetch_user(case.author)) or ctx.me
             guild = self.bot.get_guild(case.guild) or author.dm_channel or ctx.guild
@@ -178,7 +178,7 @@ class Debug(commands.Cog):
                     await interaction.response.send_message(f"Deleted case #{case.id}.", ephemeral=True)
 
             paginator = pagination.Paginator(pages, show_disabled=False, timeout=300, custom_view=CustomView())
-            await paginator.respond(ctx.interaction, ephemeral=True)
+            await paginator.respond(ctx.interaction, ephemeral=ephemeral)
 
 
 def setup(bot):
