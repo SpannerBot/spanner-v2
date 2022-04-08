@@ -47,7 +47,7 @@ class WelcomeMessage(orm.Model):
     tablename = "welcome_messages"
     registry = models
     fields = {
-        "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4()),
+        "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4),
         "id": orm.BigInteger(unique=True, index=True),  # guild_id
         "guild": orm.ForeignKey(Guild),
         "message": orm.String(min_length=1, max_length=4029, default=None),
