@@ -515,10 +515,10 @@ class Info(commands.Cog):
                 if getattr(ctx.guild.system_channel_flags, flag) is True:
                     system_channel_flags.append(name)
 
-        if ctx.guild.me.guild_permissions.create_instant_invite:
+        if ctx.guild.me.guild_permissions.manage_guild:
             invites = len(await ctx.guild.invites())
         else:
-            invites = "Missing 'create instant invite' permission."
+            invites = "Missing 'manage server' permission."
 
         if ctx.guild.me.guild_permissions.manage_webhooks:
             webhooks = len(await ctx.guild.webhooks())
