@@ -100,7 +100,7 @@ class Utility(commands.Cog):
             logger.debug(
                 "Channel %r already has an edit-deque, of size %s.",
                 after.channel.id,
-                len(self.deleted_snipes[before.channel]),
+                len(self.edited_snipes[before.channel]),
             )
 
     # BEGIN COMMANDS

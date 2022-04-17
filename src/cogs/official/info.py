@@ -36,6 +36,13 @@ content_filter_names = {
     discord.ContentFilter.all_members: "Scan media content from all members",
 }
 
+nsfw_levels = {
+    discord.NSFWLevel.default: "Uncategorized",
+    discord.NSFWLevel.explicit: "Guild contains NSFW content",
+    discord.NSFWLevel.safe: "Guild does not contain NSFW content",
+    discord.NSFWLevel.age_restricted: "Guild *may* contain NSFW content"
+}
+
 
 class Info(commands.Cog):
     def __init__(self, bot: Bot):
@@ -526,7 +533,7 @@ class Info(commands.Cog):
             webhooks = "Missing 'manage webhooks' permission."
 
         if ctx.guild.me.guild_permissions.ban_members:
-            bans = f"{len(await ctx.guild.bans()):,}"
+            bans = f"{len(await ctx.guild.bans().flatten()):,}"
         else:
             bans = "Missing 'ban members' permission."
 
@@ -544,7 +551,10 @@ class Info(commands.Cog):
             f"**Discovery Splash URL**: {discovery_splash}",
             f"**Owner**: {ctx.guild.owner.mention}",
             f"**Created**: <t:{round(ctx.guild.created_at.timestamp())}:R>",
+            f"**Locale**: {ctx.guild.preferred_locale}",
+            f"**NSFW Level**: {nsfw_levels[ctx.guild.nsfw_level]}",
             f"**Emojis**: {len(ctx.guild.emojis)}",
+            f"**Stickers**: {len(ctx.guild.stickers)}",
             f"**Roles**: {len(ctx.guild.roles)}",
             f"**Members**: {ctx.guild.member_count:,}",
             f"**VC AFK Timeout**: {utils.format_time(ctx.guild.afk_timeout)}",
@@ -556,6 +566,7 @@ class Info(commands.Cog):
             f"**Features**: {', '.join(str(x).title().replace('_', ' ') for x in ctx.guild.features)}",
             f"**Boost Level**: {ctx.guild.premium_tier}",
             f"**Boost Count**: {ctx.guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
+            f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(ctx.guild.premium_progress_bar_enabled)}"
             f"**Invites**: {invites}",
             f"**Webhooks**: {webhooks}",
             f"**Bans**: {bans}",
@@ -571,6 +582,10 @@ class Info(commands.Cog):
             f"**Sticker Limit**: {ctx.guild.sticker_limit:,}",
             f"**Max VC bitrate**: {ctx.guild.bitrate_limit/1000:.1f}kbps",
             f"**Max Upload Size**: {ctx.guild.filesize_limit/1024/1024:.1f}MB",
+            f"**Max Members**: {ctx.guild.max_members:,}",
+            f"**Max Online Members**: {ctx.guild.max_presences:,}",
+            f"**Max Video Channel Users**: {ctx.guild.max_video_channel_users}",
+            f"**Scheduled Events**: {len(ctx.guild.scheduled_events)}"
         ]
         values = list(filter(lambda x: x is not None, values))
         embed = discord.Embed(

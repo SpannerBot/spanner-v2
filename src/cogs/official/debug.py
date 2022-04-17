@@ -1,15 +1,28 @@
+import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
 import discord
 import orm
 from discord.commands import permissions
+from discord.ext import bridge
 from discord.ext import commands, pages as pagination
 
 from src.bot.client import Bot
 from src.database import Errors, models
 from src.utils import utils
+
+
+async def get_similar_case_ids(ctx: discord.AutocompleteContext):
+    results: List[int] = [
+        x.id
+        for x in await Errors.objects.all()
+        if str(ctx.value) in str(x.id)
+    ]
+    ctx.bot.console.log("Found %s results for case IDs." % len(results))
+    return results
 
 
 class Debug(commands.Cog):
@@ -21,12 +34,27 @@ class Debug(commands.Cog):
     @commands.is_owner()
     async def find_id_type(self, ctx: commands.Context, *, obj: int):
         converters = (
+            commands.GuildConverter,
             commands.GuildChannelConverter,
+            commands.RoleConverter,
             commands.MemberConverter,
             commands.UserConverter,
+            commands.MessageConverter,
+            commands.EmojiConverter,
+            commands.PartialEmojiConverter,
             commands.ObjectConverter,
         )
-        result: Union[discord.abc.GuildChannel, discord.Member, discord.User, discord.Object]
+        result: Union[
+            discord.Guild,
+            discord.abc.GuildChannel,
+            discord.Role,
+            discord.Member,
+            discord.User,
+            discord.Message,
+            discord.Emoji,
+            discord.PartialEmoji,
+            discord.Object
+        ]
         async with ctx.channel.typing():
             for converter in converters:
                 try:
@@ -42,9 +70,10 @@ class Debug(commands.Cog):
                 f"{result.id} is a {result.type.name} channel ({result.mention}) in {result.guild.name} "
                 f"({result.guild.id})"
             )
-        return await ctx.reply(f"{obj} is a {result.__class__.__name__} with ID {result.id}.")
+        return await ctx.reply(f"{obj} is a {result.__class__.__name__!r} with ID {result.id}.",
+                               allowed_mentions=discord.AllowedMentions.none())
 
-    @commands.slash_command(name="ping")
+    @bridge.bridge_command(name="ping")
     @permissions.is_owner()
     async def ping(self, ctx: discord.ApplicationContext):
         """Shows the bot's latency."""
@@ -111,8 +140,12 @@ class Debug(commands.Cog):
         raise FileNotFoundError("Artificial error.")
 
     @commands.slash_command(name="get-error-case", default_permission=True)
-    # @permissions.is_owner()
-    async def get_error_case(self, ctx: discord.ApplicationContext, case_id: int, ephemeral: bool = True):
+    async def get_error_case(
+            self,
+            ctx: discord.ApplicationContext,
+            case_id: discord.Option(int, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)),
+            ephemeral: bool = True
+    ):
         """Fetches an error case"""
         if not await self.bot.is_owner(ctx.user):
             return await ctx.respond("This command is developer-only.")

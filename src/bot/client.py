@@ -22,10 +22,23 @@ INTENTS = discord.Intents.all()
 logger = logging.getLogger(__name__)
 
 
+def load_colon_int_list(raw: str) -> List[int]:
+    results = [
+        int(x)
+        for x in raw.split(":")
+        if x
+    ]
+    return results
+
+
 class Bot(commands.Bot):
     def __init__(self):
-        owner_ids = set(map(int, (os.environ["OWNER_IDS"]).split(":")))
-        guild_ids = set(map(int, (os.environ["SLASH_GUILDS"]).split(":")))
+        _owner_ids = os.getenv("OWNER_IDS")
+        if _owner_ids:
+            owner_ids = load_colon_int_list(_owner_ids)
+        else:
+            owner_ids = None
+        guild_ids = load_colon_int_list(os.getenv("SLASH_GUILDS", ""))
         is_debug = os.environ["DEBUG"].lower() == "true"
         if not is_debug:
             guild_ids = None
@@ -58,7 +71,8 @@ class Bot(commands.Bot):
         self.home = Path(__file__).parents[1]  # /src directory.
         logger.debug("Project home is at %r, and CWD is %r." % (str(self.home.absolute()), str(os.getcwd())))
 
-        self.console.log("Owner IDs: %s" % ", ".join(str(x) for x in owner_ids))
+        if self.owner_ids:
+            self.console.log("Owner IDs: %s" % ", ".join(str(x) for x in self.owner_ids))
         if self.debug:
             self.console.log("Debug Guild IDs: %s" % ", ".join(str(x) for x in guild_ids))
 
@@ -67,7 +81,7 @@ class Bot(commands.Bot):
         # Basically, use the main token when not in debug mode, but look for a dev token before falling back in dev mode
         primary = os.getenv("BOT_TOKEN")
         old = os.getenv("DISCORD_TOKEN")
-        if old:
+        if old is not None:
             warnings.warn(
                 DeprecationWarning("The environment variable `DISCORD_TOKEN` is deprecated in favour of `BOT_TOKEN`.")
             )
@@ -221,14 +235,21 @@ class Bot(commands.Bot):
             return
         await super().on_command_error(context, exception)
 
-    async def find_invite(self, channel: discord.TextChannel) -> Optional[discord.Invite]:
-        """Returns a random unlimited-use invite from the provided channel"""
+    @staticmethod
+    async def find_invite(channel: discord.abc.GuildChannel, *, infinite: bool = False) -> Optional[discord.Invite]:
+        """
+        Returns a random unlimited-use invite from the provided channel
+
+        :param channel: The channel to find invites for.
+        :param infinite: If True, this will make sure both max uses and max age are infinite.
+        :return: Optional[discord.Invite]
+        """
         if not channel.permissions_for(channel.guild.me).create_instant_invite:
             return
 
         invites = list(
             filter(
-                lambda inv: inv.max_uses == 0 and inv.temporary is False,
+                lambda inv: inv.max_uses == 0 and inv.temporary is False and (inv.max_age == 0 if infinite else True),
                 await channel.invites()
             )
         )
