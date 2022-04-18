@@ -21,7 +21,7 @@ async def get_similar_case_ids(ctx: discord.AutocompleteContext):
         for x in await Errors.objects.all()
         if str(ctx.value) in str(x.id)
     ]
-    ctx.bot.console.log("Found %s results for case IDs." % len(results))
+    results.sort(reverse=True)  # brings the newest case IDs first
     return results
 
 

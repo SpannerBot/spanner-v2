@@ -1,6 +1,8 @@
+import datetime
 import platform
 import subprocess
 import sys
+import time
 import unicodedata
 from io import BytesIO
 from textwrap import shorten
@@ -108,6 +110,10 @@ class Info(commands.Cog):
             file = discord.File(bio, filename=f"avatar.{ext}")
             embed = discord.Embed(colour=discord.Colour.dark_orange()).set_image(url=f"attachment://avatar.{ext}")
 
+        if file is not None:
+            embed.set_footer(text="persistent file - even if the user's avatar changes, this image will still work.")
+        else:
+            embed.set_footer(text="cached file - if the user's avatar changes, this image will break.")
         return content, embed, file
 
     @commands.slash_command()
@@ -151,7 +157,7 @@ class Info(commands.Cog):
                 "That user does not exist.\nTIP: for more accurate results, try using the user's "
                 "ID, since that will always return a result if the ID is correct. If you do not"
                 " have the user's ID, you can try their username#discriminator pair, like"
-                f" `{ctx.user!s}`."
+                f" `{ctx.user!s}`, however this will only work if the bot shares a mutual server with them."
             )
 
         embed = discord.Embed(
@@ -184,9 +190,9 @@ class Info(commands.Cog):
                     version_id = "0 (unknown)"
                     for line in release_file.readlines():
                         if line.startswith("NAME="):
-                            version_name = line.split("=")[1].strip().title().strip('"')
+                            version_name = line.split("=")[1].strip().strip('"')
                         elif line.startswith("VERSION="):
-                            version_id = line.split("=")[1].strip().title().strip('"')
+                            version_id = line.split("=")[1].strip().strip('"')
 
                     version_string = "%s %s" % (version_name, version_id)
 
@@ -196,12 +202,15 @@ class Info(commands.Cog):
                     version_string += ", kernel version `%s`" % kernel_version.stdout.strip()
                     os_version = version_string
 
+            sys_started = discord.utils.utcnow() - datetime.timedelta(seconds=time.monotonic())
+
             embed = discord.Embed(
                 title="My Information:",
                 description=f"WebSocket Latency (ping): {latency}ms\n"
-                f"Bot Started: <t:{round(self.bot.started_at.timestamp())}:R>\n"
-                f"Bot Last Connected: <t:{round(self.bot.last_logged_in.timestamp())}:R>\n"
-                f"Bot Created: <t:{round(self.bot.user.created_at.timestamp())}:R>\n"
+                f"Bot Started: {discord.utils.format_dt(self.bot.started_at, 'R')}\n"
+                f"System Started: {discord.utils.format_dt(sys_started, 'R')}\n"
+                f"Bot Last Connected: {discord.utils.format_dt(self.bot.last_logged_in, 'R')}\n"
+                f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}\n"
                 f"\n"
                 f"Cached Users: {len(self.bot.users):,}\n"
                 f"Guilds: {len(self.bot.guilds):,}\n"
@@ -212,7 +221,7 @@ class Info(commands.Cog):
                 f"Python Version: {sys.version.split(' ')[0]}\n"
                 f"Pycord Version: {discord.__version__}\n"
                 f"Bot Version: [v2#{spanner_version}](https://github.com/EEKIM10/spanner-v2/tree/{spanner_version})\n"
-                f"OS Version: {os_version}",
+                f"OS Version: {os_version}\n",
                 colour=0x049319,
                 timestamp=discord.utils.utcnow(),
             )
@@ -268,7 +277,7 @@ class Info(commands.Cog):
                 f"**Category**: {channel.category.name if channel.category else 'None'}",
                 f"**Members who can see it**: {len(channel.members)}",
                 f"**NSFW?** {utils.Emojis.bool(nsfw)}",
-                f"**Created**: <t:{round(channel.created_at.timestamp())}:R>",
+                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
                 f"**Invites**: {', '.join(invites)}",
                 f"**Webhooks**: {webhooks}",
                 f"**Permissions Synced?** {utils.Emojis.bool(channel.permissions_synced)}",
@@ -295,7 +304,7 @@ class Info(commands.Cog):
                 f"**Bitrate**: {channel.bitrate/1000}kbps",
                 f"**User Limit**: {channel.user_limit}",
                 f"**In Chat Now**: {len(channel.members)}",
-                f"**Created**: <t:{round(channel.created_at.timestamp())}:R>",
+                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
                 f"**Permissions Synced**: {utils.Emojis.bool(channel.permissions_synced)}",
                 f"**Voice Region**: {channel.rtc_region.value if channel.rtc_region else 'Automatic'}",
                 f"**Video Quality**: {channel.video_quality_mode.value}",
@@ -307,7 +316,7 @@ class Info(commands.Cog):
             values = [
                 f"**ID**: `{channel.id}`",
                 f"**Name**: {discord.utils.escape_markdown(channel.name)}",
-                f"**Created**: <t:{round(channel.created_at.timestamp())}:R>",
+                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
                 f"**Position**: {channel.position}",
                 f"**Text Channels**: {len(channel.text_channels)}",
                 f"**Voice Channels**: {len(channel.voice_channels)}",
@@ -326,7 +335,7 @@ class Info(commands.Cog):
                 f"**Category**: {channel.category.name if channel.category else 'No Category'}",
                 f"**Bitrate**: {channel.bitrate/1000}kbps",
                 f"**In Chat Now**: {len(channel.members)}",
-                f"**Created**: <t:{round(channel.created_at.timestamp())}:R>",
+                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
                 f"**Permissions Synced**: {utils.Emojis.bool(channel.permissions_synced)}",
                 f"**Voice Region**: {channel.rtc_region.value if channel.rtc_region else 'Automatic'}",
                 f"**Video Quality**: {channel.video_quality_mode.value}",
@@ -449,7 +458,7 @@ class Info(commands.Cog):
             return await ctx.respond("Invalid Invite Code.", ephemeral=True)
 
         if invite.expires_at:
-            expires_at = f"<t:{round(invite.expires_at.timestamp())}:R>"
+            expires_at = discord.utils.format_dt(invite.expires_at, "R")
         else:
             expires_at = f"Never"
 
@@ -487,7 +496,7 @@ class Info(commands.Cog):
             f"**Name**: {discord.utils.escape_markdown(invite.guild.name)}",
             f"**Verification Level**: {invite.guild.verification_level.name} "
             f"({verification_levels[invite.guild.verification_level]})",
-            f"**Member Count**: {member_count}",
+            f"**Member Count**: {member_count:,}",
         ]
 
         embed = discord.Embed(
@@ -550,7 +559,7 @@ class Info(commands.Cog):
             f"**Splash URL**: {self.hyperlink(ctx.guild.splash.url)}" if ctx.guild.splash else None,
             f"**Discovery Splash URL**: {discovery_splash}",
             f"**Owner**: {ctx.guild.owner.mention}",
-            f"**Created**: <t:{round(ctx.guild.created_at.timestamp())}:R>",
+            f"**Created**: {discord.utils.format_dt(ctx.guild.created_at, 'R')}",
             f"**Locale**: {ctx.guild.preferred_locale}",
             f"**NSFW Level**: {nsfw_levels[ctx.guild.nsfw_level]}",
             f"**Emojis**: {len(ctx.guild.emojis)}",
@@ -566,7 +575,7 @@ class Info(commands.Cog):
             f"**Features**: {', '.join(str(x).title().replace('_', ' ') for x in ctx.guild.features)}",
             f"**Boost Level**: {ctx.guild.premium_tier}",
             f"**Boost Count**: {ctx.guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
-            f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(ctx.guild.premium_progress_bar_enabled)}"
+            f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(ctx.guild.premium_progress_bar_enabled)}",
             f"**Invites**: {invites}",
             f"**Webhooks**: {webhooks}",
             f"**Bans**: {bans}",
@@ -582,8 +591,8 @@ class Info(commands.Cog):
             f"**Sticker Limit**: {ctx.guild.sticker_limit:,}",
             f"**Max VC bitrate**: {ctx.guild.bitrate_limit/1000:.1f}kbps",
             f"**Max Upload Size**: {ctx.guild.filesize_limit/1024/1024:.1f}MB",
-            f"**Max Members**: {ctx.guild.max_members:,}",
-            f"**Max Online Members**: {ctx.guild.max_presences:,}",
+            f"**Max Members**: {ctx.guild.max_members or 500000:,}",
+            f"**Max Online Members**: {ctx.guild.max_presences or ctx.guild.max_members or 500000:,}",
             f"**Max Video Channel Users**: {ctx.guild.max_video_channel_users}",
             f"**Scheduled Events**: {len(ctx.guild.scheduled_events)}"
         ]
