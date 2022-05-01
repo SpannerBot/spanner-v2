@@ -254,8 +254,25 @@ class Utility(commands.Cog):
             return await paginator.respond(ctx.interaction, ephemeral=True)
 
     @commands.slash_command(name="simple-poll")
-    async def simple_poll(self, ctx: discord.ApplicationContext, question: str, duration: str = "1 day"):
+    async def simple_poll(
+            self,
+            ctx: discord.ApplicationContext,
+            question: str,
+            duration: discord.Option(
+                str,
+                default="1 day"
+            ),
+            post_in: discord.Option(
+                discord.TextChannel,
+                default=None
+            )
+    ):
         """Creates a simple yes or no poll."""
+        post_in = post_in or ctx.channel
+        post_in: discord.TextChannel
+        if not post_in.can_send(discord.Embed()):
+            return await ctx.interaction.response.send_message(f"I cannot send a message in {post_in.mention}.",
+                                                               ephemeral=True)
         try:
             seconds = utils.parse_time(duration)
             if seconds > 2635200:
