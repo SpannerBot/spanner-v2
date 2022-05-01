@@ -264,7 +264,7 @@ class Utility(commands.Cog):
 
         embed = discord.Embed(
             title=question[:2048],
-            description=f"Poll closes in {discord.utils.format_dt(poll_closes, 'R')}.",
+            description=f"Poll closes {discord.utils.format_dt(poll_closes, 'R')}.",
         )
         embed.set_author(name="%s asks..." % ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
         entry = await SimplePoll.objects.create(
