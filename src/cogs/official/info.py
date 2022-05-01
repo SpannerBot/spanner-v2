@@ -249,9 +249,10 @@ class Info(commands.Cog):
     async def channel_info(
         self,
         ctx: discord.ApplicationContext,
-        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.CategoryChannel],
+        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.CategoryChannel] = None,
     ):
         """Shows you information on a channel."""
+        channel = channel or ctx.channel
         await ctx.defer()
         if isinstance(channel, discord.TextChannel):
             locked = channel.permissions_for(channel.guild.default_role).read_messages is False
