@@ -264,7 +264,8 @@ class Utility(commands.Cog):
             ),
             post_in: discord.Option(
                 discord.TextChannel,
-                default=None
+                default=None,
+                name="post-in"
             )
     ):
         """Creates a simple yes or no poll."""
