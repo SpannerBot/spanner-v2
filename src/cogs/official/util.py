@@ -258,6 +258,10 @@ class Utility(commands.Cog):
         """Creates a simple yes or no poll."""
         try:
             seconds = utils.parse_time(duration)
+            if seconds > 2635200:
+                return await ctx.respond("Poll duration must be less than a month.", ephemeral=True)
+            elif seconds < 0:
+                return await ctx.respond("How did you get *negative* poll time?", ephemeral=True)
             poll_closes = discord.utils.utcnow() + timedelta(seconds=seconds)
         except ValueError:
             return await ctx.respond("Invalid time format. Try passing something like '30 seconds'.", ephemeral=True)
