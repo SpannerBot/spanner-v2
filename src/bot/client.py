@@ -261,6 +261,7 @@ class Bot(commands.Bot):
     async def on_application_command_error(
         self, context: discord.ApplicationContext, exception: discord.DiscordException
     ) -> None:
+        error = exception
         traceback.print_exception(type(error), error, error.__traceback__)
         exception = getattr(exception, "original", exception)
         try:
