@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import textwrap
+import traceback
 import warnings
 from pathlib import Path
 from typing import List, Optional
@@ -260,6 +261,7 @@ class Bot(commands.Bot):
     async def on_application_command_error(
         self, context: discord.ApplicationContext, exception: discord.DiscordException
     ) -> None:
+        traceback.print_exc()
         exception = getattr(exception, "original", exception)
         try:
             case = await utils.create_error(context, exception)
