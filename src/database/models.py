@@ -40,6 +40,7 @@ class Guild(orm.Model):
         "id": orm.BigInteger(unique=True, index=True),
         "prefix": orm.String(min_length=1, max_length=16, default="s!"),
         "log_channel": orm.BigInteger(allow_null=True, default=None),
+        "disable_snipe": orm.Boolean(default=False),
     }
 
 

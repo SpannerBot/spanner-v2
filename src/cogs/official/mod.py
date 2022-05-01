@@ -22,7 +22,7 @@ class PermissionsError(commands.CommandError):
 
 class Moderation(commands.Cog):
     case_identifier_regex = re.compile(
-        r"Case#[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}\|\s"
+        r"Case#[a-fA-F\d]{8}-[a-fA-F\d]{4}-[a-fA-F\d]{4}-[a-fA-F\d]{4}-[a-fA-F\d]{12}\|\s"
     )
 
     def __init__(self, bot):
@@ -109,108 +109,124 @@ class Moderation(commands.Cog):
         return await ctx.respond(content, ephemeral=True)
 
     @commands.slash_command(name="hackban")
-    async def hackban(self, ctx: discord.ApplicationContext, user_id: str, *, reason: str = "No Reason Provided"):
+    async def hackban(
+            self,
+            ctx: discord.ApplicationContext,
+            user: discord.Option(discord.User, description="The user to ban. You should provide their ID."),
+            *,
+            reason: str = "No Reason Provided"
+    ):
         """Bans a user by their ID before they can enter the server."""
         try:
             self.check_action_permissions(ctx.user, ctx.user, "ban_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
+        if await discord.utils.get_or_fetch(ctx.guild, "member", user.id, default=None):
+            return await ctx.respond("User is already in the server. Please use regular /ban.", ephemeral=True)
+
+        view = YesNoPrompt(timeout=300.0)
+        await ctx.respond(
+            embed=discord.Embed(
+                title="Are you sure you want to hackban {!s}?".format(user), colour=discord.Colour.orange()
+            ).set_footer(text=str(user), icon_url=user.display_avatar.url),
+            view=view,
+            ephemeral=True,
+        )
+        await view.wait()
+        if not view.confirm:
+            return await ctx.respond("Hackban cancelled.", ephemeral=True, view=None, embed=None)
+
+        guild = await Guild.objects.get(id=ctx.guild.id)
+        case = await Cases.objects.create(
+            id=await self.get_next_case_id(guild),
+            guild=guild,
+            moderator=ctx.user.id,
+            target=user.id,
+            reason=reason,
+            type=CaseType.BAN,
+        )
+
         try:
-            user = await commands.UserConverter().convert(ctx, user_id)
-        except commands.UserNotFound:
-            return await ctx.respond("User not found.", ephemeral=True)
+            await ctx.guild.ban(user, reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=7)
+        except discord.HTTPException as e:
+            await case.delete()
+            return await ctx.edit(content="Failed to ban user: {!s}".format(e), embed=None, view=None)
+        except Exception:
+            await case.delete()
+            raise
         else:
-            if await discord.utils.get_or_fetch(ctx.guild, "member", user.id, default=None):
-                return await ctx.respond("User is already in the server. Please use regular /ban.", ephemeral=True)
-
-            view = YesNoPrompt(timeout=300.0)
-            await ctx.respond(
-                embed=discord.Embed(
-                    title="Are you sure you want to hackban {!s}?".format(user), colour=discord.Colour.orange()
-                ).set_footer(text=str(user), icon_url=user.display_avatar.url),
-                view=view,
-                ephemeral=True,
+            return await ctx.edit(
+                content="User {!s} has been banned.\nCase ID: {!s}".format(user, case.id), embed=None, view=None
             )
-            await view.wait()
-            if not view.confirm:
-                return await ctx.respond("Hackban cancelled.", ephemeral=True, view=None, embed=None)
-
-            guild = await Guild.objects.get(id=ctx.guild.id)
-            case = await Cases.objects.create(
-                id=await self.get_next_case_id(guild),
-                guild=guild,
-                moderator=ctx.user.id,
-                target=user.id,
-                reason=reason,
-                type=CaseType.BAN,
-            )
-
-            try:
-                await ctx.guild.ban(user, reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=7)
-            except discord.HTTPException as e:
-                await case.delete()
-                return await ctx.edit(content="Failed to ban user: {!s}".format(e), embed=None, view=None)
-            except Exception:
-                await case.delete()
-                raise
-            else:
-                return await ctx.edit(
-                    content="User {!s} has been banned.\nCase ID: {!s}".format(user, case.id), embed=None, view=None
-                )
 
     @commands.slash_command(name="unban")
-    async def unban(self, ctx: discord.ApplicationContext, user_id: str, *, reason: str = "No Reason Provided"):
+    async def unban(
+            self,
+            ctx: discord.ApplicationContext,
+            user: discord.Option(discord.User, description="The user to unban. You should pass their user ID."),
+            *,
+            reason: str = "No Reason Provided"
+    ):
+        """Unbans a user."""
         try:
             self.check_action_permissions(ctx.user, ctx.user, "ban_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
         try:
-            user = await commands.UserConverter().convert(ctx, user_id)
-        except commands.UserNotFound:
-            return await ctx.respond("User not found.", ephemeral=True)
+            ban = await ctx.guild.fetch_ban(discord.Object(id=user.id))
+        except discord.NotFound:
+            return await ctx.respond("User is not banned.", ephemeral=True)
         else:
-            try:
-                ban = await ctx.guild.fetch_ban(discord.Object(id=user.id))
-            except discord.NotFound:
-                return await ctx.respond("User is not banned.", ephemeral=True)
+            guild = await utils.get_guild(ctx.guild)
+            if ban.reason:
+                ban_reason = self.case_identifier_regex.sub("", ban.reason, 1)
             else:
-                guild = await utils.get_guild(ctx.guild)
-                if ban.reason:
-                    ban_reason = self.case_identifier_regex.sub("", ban.reason, 1)
-                else:
-                    ban_reason = ban.reason
-                ban_reason = textwrap.shorten(ban_reason, width=1024, placeholder="...") if ban.reason else None
-                embed = discord.Embed(
-                    title="Are you sure you want to unban %s?" % ban.user,
-                    description=f"They were previously banned for:\n\n{ban_reason}" if ban_reason else None,
-                    colour=discord.Colour.orange(),
+                ban_reason = ban.reason
+            ban_reason = textwrap.shorten(ban_reason, width=1024, placeholder="...") if ban.reason else None
+            embed = discord.Embed(
+                title="Are you sure you want to unban %s?" % ban.user,
+                description=f"They were previously banned for:\n\n{ban_reason}" if ban_reason else None,
+                colour=discord.Colour.orange(),
+            )
+            embed.set_footer(text=str(ban.user), icon_url=ban.user.avatar.url)
+            view = YesNoPrompt(timeout=300.0)
+            await ctx.respond(embed=embed, view=view, ephemeral=True)
+            await view.wait()
+            if not view.confirm:
+                return await ctx.edit(content="Did not unban %s." % ban.user, embed=None, view=None)
+            else:
+                case = await Cases.objects.create(
+                    id=await self.get_next_case_id(guild),
+                    guild=guild,
+                    moderator=ctx.user.id,
+                    target=ban.user.id,
+                    reason=reason,
+                    type=CaseType.UN_BAN,
                 )
-                embed.set_footer(text=str(ban.user), icon_url=ban.user.avatar.url)
-                view = YesNoPrompt(timeout=300.0)
-                await ctx.respond(embed=embed, view=view, ephemeral=True)
-                await view.wait()
-                if not view.confirm:
-                    return await ctx.edit(content="Did not unban %s." % ban.user, embed=None, view=None)
-                else:
-                    case = await Cases.objects.create(
-                        id=await self.get_next_case_id(guild),
-                        guild=guild,
-                        moderator=ctx.user.id,
-                        target=ban.user.id,
-                        reason=reason,
-                        type=CaseType.UN_BAN,
-                    )
-                    await ctx.guild.unban(ban.user, reason=f"Case#{case.entry_id}| " + reason)
-                    return await ctx.edit(
-                        content="User {!s} has been unbanned.\nCase ID: {!s}".format(user, case.id),
-                        embed=None,
-                        view=None,
-                    )
+                await ctx.guild.unban(ban.user, reason=f"Case#{case.entry_id}| " + reason)
+                return await ctx.edit(
+                    content="User {!s} has been unbanned.\nCase ID: {!s}".format(user, case.id),
+                    embed=None,
+                    view=None,
+                )
 
     @commands.slash_command(name="ban")
-    async def ban(self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided"):
+    async def ban(
+            self,
+            ctx: discord.ApplicationContext,
+            member: discord.Member,
+            delete_messages: discord.Option(
+                int,
+                description="How many days of their recent messages to delete",
+                default=7,
+                min_value=0,
+                max_value=7
+            ),
+            reason: str = "No Reason Provided"
+    ):
+        """Bans a member from the server."""
         try:
             self.check_action_permissions(ctx.user, member, "ban_members", allow_self=False)
         except PermissionsError as e:
@@ -243,7 +259,7 @@ class Moderation(commands.Cog):
             )
 
             try:
-                await member.ban(reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=7)
+                await member.ban(reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=delete_messages)
             except discord.HTTPException as e:
                 await case.delete()
                 return await ctx.edit(content="Failed to ban user: {!s}".format(e), embed=None, view=None)
@@ -301,7 +317,14 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="mute")
     async def mute(
-        self, ctx: discord.ApplicationContext, member: discord.Member, time: str, reason: str = "No Reason Provided"
+        self,
+            ctx: discord.ApplicationContext,
+            member: discord.Member,
+            time: discord.Option(
+                str,
+                description="How long to mute this member for. Example: `1h30m` (1 hour and 30 minutes)."
+            ),
+            reason: str = "No Reason Provided"
     ):
         try:
             self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
@@ -451,7 +474,7 @@ class Moderation(commands.Cog):
             title="Case #{!s}: {!s}".format(case.id, case_name),
             description=f"**Moderator**: {moderator.mention} (`{moderator.id}`)\n"
             f"**Target**: {target.mention} (`{target.id}`)\n"
-            f"{f'**Expires**: <t:{round(case.expire_at.timestamp())}:R>{nl}' if case.expire_at else ''}"
+            f"{f'**Expires**: {discord.utils.format_dt(case.expire_at)}{nl}' if case.expire_at else ''}"
             f"**Reason**: ",
             colour=discord.Colour.greyple(),
             timestamp=case.created_at,
@@ -511,22 +534,23 @@ class Moderation(commands.Cog):
             )
 
     @cases_list.command(name="user")
-    async def list_cases_for(self, ctx: discord.ApplicationContext, user: str, per_page: int = 10):
+    async def list_cases_for(
+            self,
+            ctx: discord.ApplicationContext,
+            user: discord.User,
+            per_page: discord.Option(
+                int,
+                description="How many cases to show per page",
+                max_value=25,
+                min_value=1,
+                default=10
+            )
+    ):
         """Lists all cases for a specific member in this guild. You must provide their ID if they left."""
         try:
             self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
-
-        try:
-            user = await converters.UserConverter().convert(ctx, user)
-        except commands.UserNotFound:
-            return await ctx.respond(
-                "That user does not exist.\nTIP: for more accurate results, try using the user's "
-                "ID, since that will always return a result if the ID is correct. If you do not"
-                " have the user's ID, you can try their username#discriminator pair, like"
-                f" `{ctx.user!s}`."
-            )
 
         guild = await utils.get_guild(ctx.guild)
         cases = await Cases.objects.filter(guild=guild, target=user.id).order_by("-id").all()

@@ -160,21 +160,26 @@ def format_time(seconds: int):
 
 
 TIME_REGEX = re.compile(
-    r"(?P<len>[0-9]+(\.([0-9]{0,8}))?)(\s){0,2}(?P<span>(s(ec(ond)?)?|m(in(ute)?)?|h((ou)?r)?|d(ay)?|w(eek)?)(s)?)",
+    r"(?P<len>\d+(\.(\d{0,8}))?)(\s){0,2}(?P<span>(s(ec(ond)?)?|m(in(ute)?)?|h((ou)?r)?|d(ay)?|w(eek)?)(s)?)",
     re.IGNORECASE | re.VERBOSE,
 )
-TIMESPANS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
+TIMESPANS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "y": 31536000}
 
 
 def parse_time(time: str) -> int:
     """Parses a timespan (e.g. 1d, 3 hours) into seconds"""
     time = time.strip()
-    match = TIME_REGEX.match(time)
-    if not match:
+    matches = tuple(TIME_REGEX.finditer(time))
+    if len(matches) == 0:
         raise ValueError("Invalid time format")
-    length = int(match.group("len"))
-    span = match.group("span").lower()[0]
-    return length * TIMESPANS[span]
+
+    total_seconds = 0
+    for match in matches:
+        length = int(match.group("len"))
+        span = match.group("span").lower()[0]
+        total_seconds += length * TIMESPANS[span]
+
+    return total_seconds
 
 
 async def get_guild(guild: discord.Guild):
