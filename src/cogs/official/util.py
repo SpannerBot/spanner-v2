@@ -4,7 +4,9 @@ import locale
 import logging
 import sys
 import textwrap
+import time
 from collections import deque
+from datetime import timedelta
 from typing import Dict, List, Literal, Optional, Union
 
 import discord
@@ -12,7 +14,10 @@ from discord import SlashCommandGroup
 from discord.commands import Option
 from discord.ext import commands, pages
 
+from src import utils
 from src.bot.client import Bot
+from src.database import SimplePoll
+from src.utils.views import SimplePollView
 from src.vendor.humanize.size import naturalsize
 
 logger = logging.getLogger(__name__)
@@ -247,6 +252,81 @@ class Utility(commands.Cog):
                 [get_page(x) for x in messages]
             )
             return await paginator.respond(ctx.interaction, ephemeral=True)
+
+    @commands.slash_command(name="simple-poll")
+    async def simple_poll(self, ctx: discord.ApplicationContext, question: str, duration: str = "1 day"):
+        """Creates a simple yes or no poll."""
+        try:
+            seconds = utils.parse_time(duration)
+            poll_closes = discord.utils.utcnow() + timedelta(seconds=seconds)
+        except ValueError:
+            return await ctx.respond("Invalid time format. Try passing something like '30 seconds'.", ephemeral=True)
+
+        embed = discord.Embed(
+            title=question[:2048],
+            description=f"Poll closes in {discord.utils.format_dt(poll_closes, 'R')}.",
+        )
+        embed.set_author(name="%s asks..." % ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        entry = await SimplePoll.objects.create(
+            ends_at=poll_closes,
+            owner=ctx.author.id
+        )
+        view = SimplePollView(entry.id)
+        message = await ctx.send(embed=embed, view=view)
+        await entry.update(message=message.id)
+        self.bot.add_view(view, message_id=message.id)
+        await ctx.respond(f"[Poll created.]({message.jump_url})", ephemeral=True)
+
+    # @commands.slash_command()
+    # async def poll(
+    #         self,
+    #         ctx: discord.ApplicationContext,
+    #         question: str,
+    #         poll_duration: discord.Option(
+    #             str,
+    #             description="How long the poll should last. Defaults to 1 day.",
+    #         )
+    # ):
+    #     """Creates a poll"""
+    #     options = []
+    #     selector = utils.views.CreatePollView()
+    #
+    #     def embed():
+    #         return discord.Embed(
+    #             title="Current options",
+    #             description="\n".join(options),
+    #             colour=discord.Colour.purple()
+    #         )
+    #
+    #     message = await ctx.respond(
+    #         "Please enter the options for the poll.",
+    #         view=selector,
+    #         embed=embed()
+    #     )
+    #     while True:
+    #         await message.edit(content="Please enter the options for the poll.", embed=embed(), view=selector)
+    #         await selector.wait()
+    #         if selector.value == "ADD_NEW":
+    #             input_view = utils.views.CreateNewPollOption()
+    #             await ctx.send_modal(input_view)
+    #             result = await input_view.run()
+    #             options.append(result)
+    #         elif selector.value == "REMOVE":
+    #             view = utils.views.RemovePollOptionDropDown(options)
+    #             await message.edit(content="Please select some options to remove.", view=view)
+    #             await view.wait()
+    #             options = view.value
+    #         elif selector.value == "DONE":
+    #             break
+    #         else:
+    #             await message.delete()
+    #             return
+    #
+    #     view = utils.views.PollView(
+    #         question=question,
+    #     )
+    #
+    #     await ctx.respond()
 
 
 def setup(bot):

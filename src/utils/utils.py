@@ -29,6 +29,7 @@ __all__ = (
     "parse_time",
     "chunk",
     "SessionWrapper",
+    "MaxConcurrency"
 )
 
 case_type_names = {
@@ -212,3 +213,20 @@ async def create_error(context: typing.Union[commands.Context, discord.Applicati
 
     entry = await Errors.objects.create(**kwargs)
     return entry
+
+
+_CONCURRENT_LOCKS = {}
+
+
+class MaxConcurrency:
+    def __init__(self, our_id: int, max_concurrency: int):
+        self.max_concurrency = max_concurrency
+        self.id = our_id
+
+    def __enter__(self):
+        if _CONCURRENT_LOCKS.get(self.id) is not None:
+            raise RuntimeError("Concurrency reached for this target")
+        _CONCURRENT_LOCKS[self.id] = self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        _CONCURRENT_LOCKS.pop(self.id, None)

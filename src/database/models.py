@@ -1,4 +1,5 @@
 import enum
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,7 +8,7 @@ import databases
 import discord.utils
 import orm
 
-__all__ = ("CaseType", "Guild", "WelcomeMessage", "ReactionRoles", "Cases", "Errors", "CommandType", "DB_STAT")
+__all__ = ("CaseType", "Guild", "WelcomeMessage", "ReactionRoles", "Cases", "Errors", "CommandType", "DB_STAT", "Polls", "SimplePoll")
 
 models = orm.ModelRegistry(database=databases.Database("sqlite:///main.db"))
 DB_STAT = None
@@ -110,4 +111,28 @@ class Errors(orm.Model):
         permissions_channel=orm.BigInteger(),
         permissions_guild=orm.BigInteger(),
         full_message=orm.String(min_length=2, max_length=4000, allow_null=True),
+    )
+
+
+class Polls(orm.Model):
+    registry = models
+    fields = dict(
+        id=orm.BigInteger(primary_key=True),
+        guild=orm.ForeignKey(Guild),
+        channel=orm.BigInteger(),
+        message=orm.BigInteger(),
+        options=orm.JSON(),  # list
+        results=orm.JSON(),  # dictionary
+        ends_at=orm.DateTime(),
+    )
+
+
+class SimplePoll(orm.Model):
+    registry = models
+    fields = dict(
+        id=orm.BigInteger(primary_key=True, default=lambda: round(time.time() - 1651425546)),
+        message=orm.BigInteger(allow_null=True, default=None),
+        owner=orm.BigInteger(),
+        ends_at=orm.DateTime(),
+        voted=orm.JSON(default={})
     )

@@ -15,9 +15,12 @@ from discord.ext import commands
 from rich.console import Console
 
 from src.utils import utils
-from ..database.models import models
+from ..database.models import models as db_model
+from ..database import *
 
 __all__ = ("Bot", "bot")
+
+from ..utils.views import SimplePollView
 
 INTENTS = discord.Intents.all()
 logger = logging.getLogger(__name__)
@@ -68,7 +71,7 @@ class Bot(commands.Bot):
             self.console.log = self.console.print
         self.terminal = self.console
         self.started_at = self.last_logged_in = None
-        self.loop.run_until_complete(models.create_all())
+        self.loop.run_until_complete(db_model.create_all())
         self.home = Path(__file__).parents[1]  # /src directory.
         logger.debug("Project home is at %r, and CWD is %r." % (str(self.home.absolute()), str(os.getcwd())))
 
@@ -316,6 +319,12 @@ class Bot(commands.Bot):
             await super().on_application_command_error(context, exception)
 
     async def start(self, token: str, *, reconnect: bool = True) -> None:
+        for poll in await SimplePoll.objects.all():
+            view = SimplePollView(poll.id)
+            self.add_view(
+                view,
+                message_id=poll.message
+            )
         self.console.log("Waiting for network...")
         await self.wait_for_network()
         self.console.log("Network ready!")
