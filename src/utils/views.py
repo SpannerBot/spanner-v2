@@ -53,7 +53,7 @@ class SimplePollViewSeeResultsViewVotersView(View):
             )
             voted_no: List[Optional[discord.Member]] = list(
                 map(
-                    lambda x: interaction.guild.get_member(x) is not None, voted_no
+                    lambda x: interaction.guild.get_member(x), voted_no
                 )
             )
             voted_yes: List[discord.Member] = list(filter(lambda x: x is not None, voted_yes))
