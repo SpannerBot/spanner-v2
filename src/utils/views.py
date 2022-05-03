@@ -180,7 +180,6 @@ class SimplePollView(View):
     @button(custom_id="delete", label="Delete poll", style=ButtonStyle.red, emoji="\N{wastebasket}\U0000fe0f", row=2)
     async def delete(self, btn: discord.Button, interaction: discord.Interaction):
         db = await self.get_db()
-        await interaction.response.defer(ephemeral=True)
         if interaction.user.id != db.owner:
             return await interaction.response.send_message("You can't delete this poll!", ephemeral=True)
         else:
