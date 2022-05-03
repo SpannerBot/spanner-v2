@@ -110,11 +110,11 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="hackban")
     async def hackban(
-            self,
-            ctx: discord.ApplicationContext,
-            user: discord.Option(discord.User, description="The user to ban. You should provide their ID."),
-            *,
-            reason: str = "No Reason Provided"
+        self,
+        ctx: discord.ApplicationContext,
+        user: discord.Option(discord.User, description="The user to ban. You should provide their ID."),
+        *,
+        reason: str = "No Reason Provided",
     ):
         """Bans a user by their ID before they can enter the server."""
         try:
@@ -162,11 +162,11 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="unban")
     async def unban(
-            self,
-            ctx: discord.ApplicationContext,
-            user: discord.Option(discord.User, description="The user to unban. You should pass their user ID."),
-            *,
-            reason: str = "No Reason Provided"
+        self,
+        ctx: discord.ApplicationContext,
+        user: discord.Option(discord.User, description="The user to unban. You should pass their user ID."),
+        *,
+        reason: str = "No Reason Provided",
     ):
         """Unbans a user."""
         try:
@@ -214,17 +214,13 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="ban")
     async def ban(
-            self,
-            ctx: discord.ApplicationContext,
-            member: discord.Member,
-            delete_messages: discord.Option(
-                int,
-                description="How many days of their recent messages to delete",
-                default=7,
-                min_value=0,
-                max_value=7
-            ),
-            reason: str = "No Reason Provided"
+        self,
+        ctx: discord.ApplicationContext,
+        member: discord.Member,
+        delete_messages: discord.Option(
+            int, description="How many days of their recent messages to delete", default=7, min_value=0, max_value=7
+        ),
+        reason: str = "No Reason Provided",
     ):
         """Bans a member from the server."""
         try:
@@ -318,13 +314,12 @@ class Moderation(commands.Cog):
     @commands.slash_command(name="mute")
     async def mute(
         self,
-            ctx: discord.ApplicationContext,
-            member: discord.Member,
-            time: discord.Option(
-                str,
-                description="How long to mute this member for. Example: `1h30m` (1 hour and 30 minutes)."
-            ),
-            reason: str = "No Reason Provided"
+        ctx: discord.ApplicationContext,
+        member: discord.Member,
+        time: discord.Option(
+            str, description="How long to mute this member for. Example: `1h30m` (1 hour and 30 minutes)."
+        ),
+        reason: str = "No Reason Provided",
     ):
         try:
             self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
@@ -535,16 +530,12 @@ class Moderation(commands.Cog):
 
     @cases_list.command(name="user")
     async def list_cases_for(
-            self,
-            ctx: discord.ApplicationContext,
-            user: discord.User,
-            per_page: discord.Option(
-                int,
-                description="How many cases to show per page",
-                max_value=25,
-                min_value=1,
-                default=10
-            )
+        self,
+        ctx: discord.ApplicationContext,
+        user: discord.User,
+        per_page: discord.Option(
+            int, description="How many cases to show per page", max_value=25, min_value=1, default=10
+        ),
     ):
         """Lists all cases for a specific member in this guild. You must provide their ID if they left."""
         try:

@@ -4,7 +4,6 @@ import locale
 import logging
 import sys
 import textwrap
-import time
 from collections import deque
 from datetime import timedelta
 from typing import Dict, List, Literal, Optional, Union
@@ -12,7 +11,7 @@ from typing import Dict, List, Literal, Optional, Union
 import discord
 from discord import SlashCommandGroup
 from discord.commands import Option
-from discord.ext import commands, pages
+from discord.ext import commands, pages, tasks
 
 from src import utils
 from src.bot.client import Bot
@@ -25,16 +24,10 @@ logger = logging.getLogger(__name__)
 
 async def purge(channel: discord.TextChannel, limit: int = 1000, **kwargs) -> Optional[List[discord.Message]]:
     async def run_purge():
-        return await channel.purge(
-            limit=limit,
-            **kwargs
-        )
+        return await channel.purge(limit=limit, **kwargs)
 
     try:
-        return await asyncio.wait_for(
-            run_purge(),
-            300  # running a purge for more than 5 minutes is a bit OTT
-        )
+        return await asyncio.wait_for(run_purge(), 300)  # running a purge for more than 5 minutes is a bit OTT
     except asyncio.TimeoutError:
         return
 
@@ -48,18 +41,14 @@ async def purge_permission_check(ctx: discord.ApplicationContext) -> bool:
         await ctx.respond("You do not have permission to delete messages in this channel.", ephemeral=True)
         return False
 
-    bot_perms = discord.Permissions(
-        read_messages=True,
-        read_message_history=True,
-        manage_messages=True
-    )
+    bot_perms = discord.Permissions(read_messages=True, read_message_history=True, manage_messages=True)
     if not ctx.channel.permissions_for(ctx.me).is_superset(bot_perms):
         await ctx.respond(
             "I am missing permissions to purge in this channel. Please check that I have:\n"
             "\N{BULLET} Read messages\n"
             "\N{BULLET} Read message history\n"
             "\N{BULLET} Manage messages",
-            ephemeral=True
+            ephemeral=True,
         )
         return False
 
@@ -71,6 +60,53 @@ class Utility(commands.Cog):
         self.bot: Bot = bot
         self.deleted_snipes: Dict[discord.TextChannel, deque] = {}
         self.edited_snipes: Dict[discord.TextChannel, deque] = {}
+        self.poll_expire_loop.start()
+
+    def cog_unload(self):
+        self.poll_expire_loop.cancel()
+
+    @tasks.loop(minutes=1)
+    async def poll_expire_loop(self):
+        # NOTE: This function has very lazy error handling. If you're afraid of that, skip it :D
+        await self.bot.wait_until_ready()
+        for expired_poll in await SimplePoll.objects.filter(ends_at__lte=discord.utils.utcnow(), ended=False).all():
+            self.bot.console.log("Expired poll: %s" % expired_poll)
+            channel = self.bot.get_channel(expired_poll.channel_id)
+            if channel is None:
+                # Deleted channel, removed from the server, or we don't have edit permissions
+                await expired_poll.delete()
+
+            try:
+                message = await channel.fetch_message(expired_poll.message)
+            except discord.HTTPException:
+                # Message has been deleted
+                await expired_poll.delete()
+            else:
+                embed = message.embeds[0]
+                embed.description = "This poll has expired. Press `see results` to see the results."
+                embed.colour = discord.Colour.red()
+                view = discord.utils.get(self.bot.persistent_views, poll_id=expired_poll.id)
+                if view:
+                    index = self.bot.persistent_views.index(view)
+                    # noinspection PyUnresolvedReferences
+                    self.bot.persistent_views[index].children[0].disabled = True
+                    # noinspection PyUnresolvedReferences
+                    self.bot.persistent_views[index].children[1].disabled = True
+                    try:
+                        self.bot.console.log("Updating embed and view")
+                        await message.edit(embed=embed, view=self.bot.persistent_views[index])
+                    except discord.HTTPException:
+                        pass
+                    finally:
+                        await expired_poll.update(ended=True)
+                else:
+                    try:
+                        self.bot.console.log("Updating embed")
+                        await message.edit(embed=embed)
+                    except discord.HTTPException:
+                        pass
+                    finally:
+                        await expired_poll.update(ended=True)
 
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages: List[discord.Message]):
@@ -195,22 +231,15 @@ class Utility(commands.Cog):
             embeds.append(discord.Embed(description="Invalid snipe type."))
         return await ctx.respond(embeds=embeds)
 
-    purge = SlashCommandGroup(
-        "purge",
-        "Bulk deletes lots of messages at once."
-    )
+    purge = SlashCommandGroup("purge", "Bulk deletes lots of messages at once.")
 
     @purge.command()
     async def limit(
         self,
         ctx: discord.ApplicationContext,
         max_search: Option(
-            int,
-            "How many messages to delete. Defaults to 100.",
-            min_value=10,
-            max_value=5000,
-            default=100
-        )
+            int, "How many messages to delete. Defaults to 100.", min_value=10, max_value=5000, default=100
+        ),
     ):
         """Deletes up to <max_search> messages."""
         if not await purge_permission_check(ctx):
@@ -219,16 +248,20 @@ class Utility(commands.Cog):
         await ctx.defer(ephemeral=True)
         messages = await purge(ctx.channel, limit=max_search)
         if messages is None:
-            return await ctx.respond("Failed to purge - exceeded maximum time (5 minutes).\n"
-                                     "If you need to delete LOTS of messages, discord recommends you clone the channel"
-                                     " instead.", ephemeral=True)
+            return await ctx.respond(
+                "Failed to purge - exceeded maximum time (5 minutes).\n"
+                "If you need to delete LOTS of messages, discord recommends you clone the channel"
+                " instead.",
+                ephemeral=True,
+            )
         else:
+
             def get_page(message: discord.Message) -> Union[discord.Embed, List[discord.Embed]]:
                 embed = discord.Embed(
                     title=f"Message from {message.author}",
                     description=message.content or "no content",
                     colour=message.author.colour,
-                    timestamp=message.created_at
+                    timestamp=message.created_at,
                 )
                 embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
 
@@ -248,32 +281,24 @@ class Utility(commands.Cog):
                     return [embed, *list(filter(lambda e: e.type == "rich", message.embeds))]
                 return embed
 
-            paginator = pages.Paginator(
-                [get_page(x) for x in messages]
-            )
+            paginator = pages.Paginator([get_page(x) for x in messages])
             return await paginator.respond(ctx.interaction, ephemeral=True)
 
     @commands.slash_command(name="simple-poll")
     async def simple_poll(
-            self,
-            ctx: discord.ApplicationContext,
-            question: str,
-            duration: discord.Option(
-                str,
-                default="1 day"
-            ),
-            post_in: discord.Option(
-                discord.TextChannel,
-                default=None,
-                name="post-in"
-            )
+        self,
+        ctx: discord.ApplicationContext,
+        question: str,
+        duration: discord.Option(str, description="How long until the poll closes.", default="1 day"),
+        post_in: discord.Option(discord.TextChannel, default=None, name="post-in"),
     ):
         """Creates a simple yes or no poll."""
         post_in = post_in or ctx.channel
         post_in: discord.TextChannel
         if not post_in.can_send(discord.Embed()):
-            return await ctx.interaction.response.send_message(f"I cannot send a message in {post_in.mention}.",
-                                                               ephemeral=True)
+            return await ctx.interaction.response.send_message(
+                f"I cannot send a message in {post_in.mention}.", ephemeral=True
+            )
         try:
             seconds = utils.parse_time(duration)
             if seconds > 2635200:
@@ -289,66 +314,105 @@ class Utility(commands.Cog):
             description=f"Poll closes {discord.utils.format_dt(poll_closes, 'R')}.",
         )
         embed.set_author(name="%s asks..." % ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
-        entry = await SimplePoll.objects.create(
-            ends_at=poll_closes,
-            owner=ctx.author.id
-        )
+        entry = await SimplePoll.objects.create(ends_at=poll_closes, owner=ctx.author.id)
         view = SimplePollView(entry.id)
+        embed.set_footer(text="Poll ID: %s" % entry.id)
         message = await ctx.send(embed=embed, view=view)
-        await entry.update(message=message.id)
+        await entry.update(message=message.id, channel_id=message.channel.id)
         self.bot.add_view(view, message_id=message.id)
         await ctx.respond(f"[Poll created.]({message.jump_url})", ephemeral=True)
 
-    # @commands.slash_command()
-    # async def poll(
+    # THIS DOES NOT WORK
+    # WHY?
+    # @commands.slash_command(name="poll")
+    # async def create_poll(
     #         self,
     #         ctx: discord.ApplicationContext,
-    #         question: str,
-    #         poll_duration: discord.Option(
-    #             str,
-    #             description="How long the poll should last. Defaults to 1 day.",
+    #         number_of_options: discord.Option(
+    #             int,
+    #             description="The number of options this poll will have. Due to a discord limitation, this is 4 at most",
+    #             default=2,
+    #             min_value=1,
+    #             max_value=10
     #         )
     # ):
     #     """Creates a poll"""
+    #     _quirky_choices = (
+    #         "Yes",
+    #         "No",
+    #         "Maybe",
+    #         "I don't know",
+    #         "I don't care",
+    #         "What is cheese?",
+    #         "Only sometimes",
+    #         "Why do you ask?",
+    #         "What're you having for dinner?",
+    #         "What's your favorite color?",
+    #         "This is quite a personal question to be honest",
+    #         "Never having cheese in my life",
+    #         "I don't know what to say",
+    #         "I don't know what to do",
+    #         "I don't know what to think",
+    #         "I don't know what to taste",
+    #         f"Where are my children {ctx.author}",
+    #         "I want them back.",
+    #         "You're not fun at all",
+    #         "Wee woo.",
+    #         "knock knock"
+    #     )
+    #
+    #     class PollModal(Modal):
+    #         def __init__(self, page_number: int, question_index: int = 0):
+    #             super().__init__(
+    #                 title="Create a poll",
+    #             )
+    #             self.message = None
+    #             self.options = []
+    #             if page_number == 0:
+    #                 self.add_item(
+    #                     InputText(
+    #                         style=InputTextStyle.long,
+    #                         label="Poll message (What is this poll about?)",
+    #                         placeholder="Do you like cheese? (max chars: 2048)",
+    #                         min_length=2,
+    #                         max_length=2048,
+    #                     )
+    #                 )
+    #             for index in range(number_of_options):
+    #                 self.add_item(
+    #                     InputText(
+    #                         label="Option %d/%d" % (index + 1 + question_index, number_of_options),
+    #                         placeholder=_quirky_choices[index + question_index] + " (max chars: 100)",
+    #                         min_length=1,
+    #                         max_length=90
+    #                     )
+    #                 )
+    #
+    #         async def callback(self, interaction: discord.Interaction):
+    #             await (await interaction.response.send_message(ephemeral=True)).delete()
+    #             children = self.children.copy()
+    #             message, raw_options = children[0].value, children[1:]
+    #             self.message = message
+    #             for child in raw_options:
+    #                 self.options.append(child.value)
+    #
+    #             self.stop()
+    #
+    #     modals = [PollModal(0)]
+    #     if number_of_options > 4:
+    #         asked = 4
+    #         for i in range((number_of_options - 4) % 5):
+    #             # 5 is the max number of options per page
+    #             modals.append(PollModal(i + 1, asked))
+    #             asked += 5
+    #
     #     options = []
-    #     selector = utils.views.CreatePollView()
+    #     for modal in modals:
+    #         await ctx.send_modal(modal)
+    #         await modal.wait()
+    #         options.extend(modal.options)
     #
-    #     def embed():
-    #         return discord.Embed(
-    #             title="Current options",
-    #             description="\n".join(options),
-    #             colour=discord.Colour.purple()
-    #         )
-    #
-    #     message = await ctx.respond(
-    #         "Please enter the options for the poll.",
-    #         view=selector,
-    #         embed=embed()
-    #     )
-    #     while True:
-    #         await message.edit(content="Please enter the options for the poll.", embed=embed(), view=selector)
-    #         await selector.wait()
-    #         if selector.value == "ADD_NEW":
-    #             input_view = utils.views.CreateNewPollOption()
-    #             await ctx.send_modal(input_view)
-    #             result = await input_view.run()
-    #             options.append(result)
-    #         elif selector.value == "REMOVE":
-    #             view = utils.views.RemovePollOptionDropDown(options)
-    #             await message.edit(content="Please select some options to remove.", view=view)
-    #             await view.wait()
-    #             options = view.value
-    #         elif selector.value == "DONE":
-    #             break
-    #         else:
-    #             await message.delete()
-    #             return
-    #
-    #     view = utils.views.PollView(
-    #         question=question,
-    #     )
-    #
-    #     await ctx.respond()
+    #     self.bot.console.log(options)
 
 
 def setup(bot):

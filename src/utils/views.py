@@ -1,7 +1,9 @@
 import datetime
 import os
+from typing import Dict, List, Optional
 
 import discord
+from discord.ext import pages, commands
 from discord.ui import View, Item, Button, Select, button, InputText, Modal
 from discord import ButtonStyle, InputTextStyle
 from src.database import Polls, SimplePoll
@@ -26,11 +28,62 @@ class YesNoPrompt(View):
         self.stop()
 
 
+class SimplePollViewSeeResultsViewVotersView(View):
+    # what the fuck
+    def __init__(self, voters: Dict[str, bool]):
+        super().__init__()
+        self.voters = voters
+
+    @button(label="View voters", style=ButtonStyle.green)
+    async def view_voters(self, btn: Button, interaction: discord.Interaction):
+        if interaction.guild is None:
+            return
+        if interaction.user.guild_permissions.administrator:
+            voted_yes: List[int] = [int(x) for x, y in self.voters.items() if y]
+            voted_no: List[int] = [int(x) for x, y in self.voters.items() if not y]
+            await interaction.response.defer(ephemeral=True)
+            await interaction.guild.query_members(
+                user_ids=voted_yes + voted_no,
+            )  # this caches them
+            voted_yes: List[Optional[discord.Member]] = list(
+                map(
+                    lambda x: interaction.guild.get_member(x),
+                    voted_yes
+                )
+            )
+            voted_no: List[Optional[discord.Member]] = list(
+                map(
+                    lambda x: interaction.guild.get_member(x) is not None, voted_no
+                )
+            )
+            voted_yes: List[discord.Member] = list(filter(lambda x: x is not None, voted_yes))
+            voted_no: List[discord.Member] = list(filter(lambda x: x is not None, voted_no))
+
+            def generate_group(group: List[discord.Member], vote_type: str) -> List[discord.Embed]:
+                boring_paginator = commands.Paginator(prefix="", suffix="", max_size=4069)
+                for member in group:
+                    boring_paginator.add_line(member.mention)
+
+                embeds = []
+                for page in boring_paginator.pages:
+                    embeds.append(discord.Embed(title="Members who voted %s:" % vote_type, description=page))
+                return embeds
+
+            fancy_pages = []
+            if voted_yes:
+                fancy_pages.extend(generate_group(voted_yes, "yes"))
+            if voted_no:
+                fancy_pages.extend(generate_group(voted_no, "no"))
+            paginator = pages.Paginator(fancy_pages, timeout=300, disable_on_timeout=True)
+            await paginator.respond(interaction, True)
+            self.stop()
+        else:
+            await interaction.response.send_message("Only administrators can view voters.", ephemeral=True)
+
+
 class SimplePollView(View):
     def __init__(self, poll_id: int):
-        super().__init__(
-            timeout=None
-        )
+        super().__init__(timeout=None)
         self.poll_id = poll_id
         self.db = None
 
@@ -51,9 +104,11 @@ class SimplePollView(View):
                     child.disabled = True
             src_message = await interaction.channel.fetch_message(db.message)
             await src_message.edit(view=self)
-            return await interaction.response.send_message(f"This poll ended {discord.utils.format_dt(db.ends_at, 'R')}"
-                                                           f"\nPress 'See results' to see the results.",
-                                                           ephemeral=True)
+            return await interaction.response.send_message(
+                f"This poll ended {discord.utils.format_dt(db.ends_at, 'R')}"
+                f"\nPress 'See results' to see the results.",
+                ephemeral=True,
+            )
         if str(interaction.user.id) in db.voted.keys():
             return await interaction.response.send_message("You already voted!", ephemeral=True)
         else:
@@ -72,9 +127,11 @@ class SimplePollView(View):
                     child.disabled = True
             src_message = await interaction.channel.fetch_message(db.message)
             await src_message.edit(view=self)
-            return await interaction.response.send_message(f"This poll ended {discord.utils.format_dt(db.ends_at, 'R')}"
-                                                           f"\nPress 'See results' to see the results.",
-                                                           ephemeral=True)
+            return await interaction.response.send_message(
+                f"This poll ended {discord.utils.format_dt(db.ends_at, 'R')}"
+                f"\nPress 'See results' to see the results.",
+                ephemeral=True,
+            )
         if str(interaction.user.id) in db.voted.keys():
             return await interaction.response.send_message("You already voted!", ephemeral=True)
         else:
@@ -99,18 +156,24 @@ class SimplePollView(View):
         else:
             colour = discord.Colour.blue()
 
+        ends_at = datetime.datetime.fromtimestamp(db.ends_at.timestamp(), tz=datetime.timezone.utc)
+        viewable = sum(1 for x in interaction.message.channel.members if x.bot is False)
+
         embed = discord.Embed(
             title=f"Poll results:",
             description=f"Yes (\N{WHITE HEAVY CHECK MARK}): {total_yes:,} ({percent(total_yes, total)}%)\n"
-                        f"No (\N{cross mark}): {total_no:,} ({percent(total_no, total)}%)\n"
-                        f"Total votes: {total:,} "
-                        f"({percent(total, len(interaction.message.channel.members))}% of members who can vote)\n"
-                        f"Poll ends {discord.utils.format_dt(db.ends_at, 'R')}.",
-            colour=colour
+            f"No (\N{cross mark}): {total_no:,} ({percent(total_no, total)}%)\n"
+            f"Total votes: {total:,} "
+            f"({percent(total, viewable)}% of members who can vote)\n"
+            f"Poll ends/ended {discord.utils.format_dt(ends_at, 'R')}.",
+            colour=colour,
         )
 
         if interaction.user.id == db.owner or datetime.datetime.utcnow() >= db.ends_at:
-            return await interaction.response.send_message(embed=embed, ephemeral=True)
+            _view = SimplePollViewSeeResultsViewVotersView(self.db.voted)
+            if not interaction.user.guild_permissions.administrator:
+                _view = None
+            return await interaction.response.send_message(embed=embed, ephemeral=True, view=_view)
         else:
             return await interaction.response.send_message("You cannot view results yet!", ephemeral=True)
 
@@ -134,41 +197,25 @@ class PollView(View):
         async def callback(self, interaction: discord.Interaction):
             await interaction.response.defer(ephemeral=True)
             if str(interaction.user.id) in self.view.entry.results.keys():
-                return await interaction.response.send_message(
-                    "You already voted in this poll.",
-                    ephemeral=True
-                )
+                return await interaction.response.send_message("You already voted in this poll.", ephemeral=True)
             else:
                 yn = YesNoPrompt(120)
                 message = await interaction.followup.send(
-                    "Would you like to vote for this option? You cannot go back!",
-                    view=yn,
-                    ephemeral=True
+                    "Would you like to vote for this option? You cannot go back!", view=yn, ephemeral=True
                 )
                 await yn.wait()
                 if yn.confirm is False:
-                    return await message.edit(
-                        "You have cancelled your vote.",
-                        view=None
-                    )
+                    return await message.edit("You have cancelled your vote.", view=None)
                 else:
                     self.view.entry.results[str(interaction.user.id)] = self.index
                     await self.view.entry.update(results=self.view.entry.results)
-                    await message.edit(
-                        "You have voted for option {}.".format(self.index),
-                        view=None
-                    )
+                    await message.edit("You have voted for option {}.".format(self.index), view=None)
 
     def __init__(self, poll_entry, options: list):
         super().__init__(timeout=None)
         self.entry = poll_entry
         for option in options:
-            self.add_item(
-                self.PollButton(
-                    label=option,
-                    index=options.index(option)
-                )
-            )
+            self.add_item(self.PollButton(label=option, index=options.index(option)))
 
 
 class CreatePollView(View):
@@ -204,15 +251,8 @@ class CreateNewPollOption(Modal):
             title="Create new poll option",
         )
         self.value = None
-        self.text_input = InputText(
-                label="Option value",
-                min_length=1,
-                max_length=100,
-                required=True
-            )
-        self.add_item(
-            self.text_input
-        )
+        self.text_input = InputText(label="Option value", min_length=1, max_length=100, required=True)
+        self.add_item(self.text_input)
 
     async def callback(self, interaction: discord.Interaction):
         self.value = self.text_input.value
@@ -226,16 +266,10 @@ class CreateNewPollOption(Modal):
 class RemovePollOptionDropDown(View):
     class SelectOption(Select):
         def __init__(self, choices: list):
-            super().__init__(
-                min_values=1, max_values=len(choices)-1
-            )
+            super().__init__(min_values=1, max_values=len(choices) - 1)
             self.choices = choices
             for opt in choices:
-                self.add_option(
-                    label=opt,
-                    value=str(choices.index(opt)),
-                    emoji="\N{cross mark}"
-                )
+                self.add_option(label=opt, value=str(choices.index(opt)), emoji="\N{cross mark}")
 
         async def callback(self, interaction: discord.Interaction):
             for choice in self.values:
@@ -246,6 +280,4 @@ class RemovePollOptionDropDown(View):
     def __init__(self, options: list):
         super().__init__()
         self.value = None
-        self.add_item(
-            self.SelectOption(options)
-        )
+        self.add_item(self.SelectOption(options))

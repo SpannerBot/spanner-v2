@@ -11,7 +11,7 @@ import dotenv
 
 os.chdir(Path(__file__).parent.absolute())
 
-dotenv_path = Path(__file__).parent.absolute() / '.env'
+dotenv_path = Path(__file__).parent.absolute() / ".env"
 if not dotenv_path.exists():
     # LOG_LEVEL= INFO  # Can be any of: DEBUG, INFO, WARNING, ERROR, CRITICAL
     # DISCORD_TOKEN= # The token to your bot. Must not be quoted, especially if running from docker (for some reason).

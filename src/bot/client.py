@@ -27,11 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def load_colon_int_list(raw: str) -> List[int]:
-    results = [
-        int(x)
-        for x in raw.split(":")
-        if x
-    ]
+    results = [int(x) for x in raw.split(":") if x]
     return results
 
 
@@ -254,7 +250,7 @@ class Bot(commands.Bot):
         invites = list(
             filter(
                 lambda inv: inv.max_uses == 0 and inv.temporary is False and (inv.max_age == 0 if infinite else True),
-                await channel.invites()
+                await channel.invites(),
             )
         )
         if not invites:
@@ -277,21 +273,17 @@ class Bot(commands.Bot):
             if os.getenv("ERROR_CHANNEL"):
                 error_channel_id = os.getenv("ERROR_CHANNEL")
                 if not error_channel_id.isdigit():
-                    warnings.warn(
-                        UserWarning("The environment variable 'ERROR_CHANNEL' is not an integer.")
-                    )
+                    warnings.warn(UserWarning("The environment variable 'ERROR_CHANNEL' is not an integer."))
 
                 error_channel_id = int(error_channel_id)
                 error_channel = self.get_channel(error_channel_id)
                 exc_embed = discord.Embed(
                     title=f"New error: #{case.id}",
                     description=f"Error: {exception!r}"[:4069],
-                    colour=discord.Colour.red()
+                    colour=discord.Colour.red(),
                 )
                 if error_channel and error_channel.can_send(exc_embed):
-                    await error_channel.send(
-                        embed=exc_embed
-                    )
+                    await error_channel.send(embed=exc_embed)
 
             await context.respond(
                 embed=discord.Embed(
@@ -305,26 +297,21 @@ class Bot(commands.Bot):
                         exception.__class__.__name__, case.id
                     ),
                     colour=discord.Colour.red(),
-                    timestamp=discord.utils.utcnow()
-                ).set_author(
-                    name=context.user.display_name,
-                    icon_url=context.user.display_avatar.url
-                ),
-                ephemeral=ephemeral
+                    timestamp=discord.utils.utcnow(),
+                ).set_author(name=context.user.display_name, icon_url=context.user.display_avatar.url),
+                ephemeral=ephemeral,
             )
             self.console.log(f"Responded to exception, case ID {case.id}.")
-        except Exception:
+        except (Exception, TypeError):
             self.console.log("Failed to respond to exception:")
             self.console.print_exception()
             await super().on_application_command_error(context, exception)
 
     async def start(self, token: str, *, reconnect: bool = True) -> None:
         for poll in await SimplePoll.objects.all():
+            self.console.log("Registering poll %s to permanent view" % poll.id)
             view = SimplePollView(poll.id)
-            self.add_view(
-                view,
-                message_id=poll.message
-            )
+            self.add_view(view, message_id=poll.message)
         self.console.log("Waiting for network...")
         await self.wait_for_network()
         self.console.log("Network ready!")

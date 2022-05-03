@@ -42,7 +42,7 @@ nsfw_levels = {
     discord.NSFWLevel.default: "Uncategorized",
     discord.NSFWLevel.explicit: "Guild contains NSFW content",
     discord.NSFWLevel.safe: "Guild does not contain NSFW content",
-    discord.NSFWLevel.age_restricted: "Guild *may* contain NSFW content"
+    discord.NSFWLevel.age_restricted: "Guild *may* contain NSFW content",
 }
 
 
@@ -249,10 +249,14 @@ class Info(commands.Cog):
     async def channel_info(
         self,
         ctx: discord.ApplicationContext,
-        channel: Union[discord.TextChannel, discord.VoiceChannel, discord.StageChannel, discord.CategoryChannel] = None,
+        channel: discord.Option(
+            discord.abc.GuildChannel,
+            description="The channel to get information on. Defaults to the current channel.",
+            default=None,
+        ),
     ):
         """Shows you information on a channel."""
-        channel = channel or ctx.channel
+        channel: discord.abc.CategoryChannel = channel or ctx.channel
         await ctx.defer()
         if isinstance(channel, discord.TextChannel):
             locked = channel.permissions_for(channel.guild.default_role).read_messages is False
@@ -595,7 +599,7 @@ class Info(commands.Cog):
             f"**Max Members**: {ctx.guild.max_members or 500000:,}",
             f"**Max Online Members**: {ctx.guild.max_presences or ctx.guild.max_members or 500000:,}",
             f"**Max Video Channel Users**: {ctx.guild.max_video_channel_users}",
-            f"**Scheduled Events**: {len(ctx.guild.scheduled_events)}"
+            f"**Scheduled Events**: {len(ctx.guild.scheduled_events)}",
         ]
         values = list(filter(lambda x: x is not None, values))
         embed = discord.Embed(

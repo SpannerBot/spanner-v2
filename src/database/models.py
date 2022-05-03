@@ -8,7 +8,18 @@ import databases
 import discord.utils
 import orm
 
-__all__ = ("CaseType", "Guild", "WelcomeMessage", "ReactionRoles", "Cases", "Errors", "CommandType", "DB_STAT", "Polls", "SimplePoll")
+__all__ = (
+    "CaseType",
+    "Guild",
+    "WelcomeMessage",
+    "ReactionRoles",
+    "Cases",
+    "Errors",
+    "CommandType",
+    "DB_STAT",
+    "Polls",
+    "SimplePoll",
+)
 
 models = orm.ModelRegistry(database=databases.Database("sqlite:///main.db"))
 DB_STAT = None
@@ -131,8 +142,10 @@ class SimplePoll(orm.Model):
     registry = models
     fields = dict(
         id=orm.BigInteger(primary_key=True, default=lambda: round(time.time() - 1651425546)),
+        channel_id=orm.BigInteger(default=None, allow_null=True),
         message=orm.BigInteger(allow_null=True, default=None),
         owner=orm.BigInteger(),
         ends_at=orm.DateTime(),
-        voted=orm.JSON(default={})
+        voted=orm.JSON(default={}),
+        ended=orm.Boolean(default=False),
     )

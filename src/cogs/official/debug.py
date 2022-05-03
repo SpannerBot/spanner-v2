@@ -16,11 +16,7 @@ from src.utils import utils
 
 
 async def get_similar_case_ids(ctx: discord.AutocompleteContext):
-    results: List[int] = [
-        x.id
-        for x in await Errors.objects.all()
-        if str(ctx.value) in str(x.id)
-    ]
+    results: List[int] = [x.id for x in await Errors.objects.all() if str(ctx.value) in str(x.id)]
     results.sort(reverse=True)  # brings the newest case IDs first
     return results
 
@@ -53,7 +49,7 @@ class Debug(commands.Cog):
             discord.Message,
             discord.Emoji,
             discord.PartialEmoji,
-            discord.Object
+            discord.Object,
         ]
         async with ctx.channel.typing():
             for converter in converters:
@@ -70,8 +66,10 @@ class Debug(commands.Cog):
                 f"{result.id} is a {result.type.name} channel ({result.mention}) in {result.guild.name} "
                 f"({result.guild.id})"
             )
-        return await ctx.reply(f"{obj} is a {result.__class__.__name__!r} with ID {result.id}.",
-                               allowed_mentions=discord.AllowedMentions.none())
+        return await ctx.reply(
+            f"{obj} is a {result.__class__.__name__!r} with ID {result.id}.",
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @bridge.bridge_command(name="ping")
     @permissions.is_owner()
@@ -128,9 +126,7 @@ class Debug(commands.Cog):
     async def invite(self, ctx: discord.ApplicationContext):
         """Gets the bot's invite link."""
         url = discord.utils.oauth_url(self.bot.user.id, scopes=("bot", "applications.commands"))
-        await ctx.respond(
-            f"[Did you know you can click on my profile and click \"add to server\"?]({url})"
-        )
+        await ctx.respond(f'[Did you know you can click on my profile and click "add to server"?]({url})')
 
     @commands.slash_command()
     @permissions.is_owner()
@@ -141,10 +137,12 @@ class Debug(commands.Cog):
 
     @commands.slash_command(name="get-error-case", default_permission=True)
     async def get_error_case(
-            self,
-            ctx: discord.ApplicationContext,
-            case_id: discord.Option(int, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)),
-            ephemeral: bool = True
+        self,
+        ctx: discord.ApplicationContext,
+        case_id: discord.Option(
+            int, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)
+        ),
+        ephemeral: bool = True,
     ):
         """Fetches an error case"""
         if not await self.bot.is_owner(ctx.user):
@@ -184,17 +182,17 @@ class Debug(commands.Cog):
                 discord.Embed(
                     title="Context",
                     description=f"**Error ID:** `{case.id}`\n"
-                                # f"**Raised**: <t:{creation_timestamp}:R>\n"  # raised is inaccurate for some reason
-                                f"**Author**: {author.mention} (`{case.author}`)\n"
-                                f"**Guild**: {guild} (`{case.guild}`)\n"
-                                f"**Channel**: {getattr(channel, 'mention', 'DMs')} (`{case.channel}`)\n"
-                                f"**Command**: {case.command}\n"
-                                f"**Interaction Type**: {case.command_type.value} command\n"
-                                f"**Permissions**: [guild]({guild_p}) | [channel-specific]({channel_p})\n"
-                                f"**Full Message Content**: {full_message}",
-                    colour=discord.Colour.blue()
+                    # f"**Raised**: <t:{creation_timestamp}:R>\n"  # raised is inaccurate for some reason
+                    f"**Author**: {author.mention} (`{case.author}`)\n"
+                    f"**Guild**: {guild} (`{case.guild}`)\n"
+                    f"**Channel**: {getattr(channel, 'mention', 'DMs')} (`{case.channel}`)\n"
+                    f"**Command**: {case.command}\n"
+                    f"**Interaction Type**: {case.command_type.value} command\n"
+                    f"**Permissions**: [guild]({guild_p}) | [channel-specific]({channel_p})\n"
+                    f"**Full Message Content**: {full_message}",
+                    colour=discord.Colour.blue(),
                 ),
-                traceback_text
+                traceback_text,
             ]
 
             class CustomView(discord.ui.View):
@@ -202,12 +200,7 @@ class Debug(commands.Cog):
                 async def delete_callback(self, button: discord.ui.Button, interaction: discord.Interaction):
                     await case.delete()
                     button.disabled = True
-                    await paginator.update(
-                        pages,
-                        show_disabled=False,
-                        timeout=300,
-                        custom_view=self
-                    )
+                    await paginator.update(pages, show_disabled=False, timeout=300, custom_view=self)
                     await interaction.response.send_message(f"Deleted case #{case.id}.", ephemeral=True)
 
             paginator = pagination.Paginator(pages, show_disabled=False, timeout=300, custom_view=CustomView())

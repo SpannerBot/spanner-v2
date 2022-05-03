@@ -29,7 +29,7 @@ __all__ = (
     "parse_time",
     "chunk",
     "SessionWrapper",
-    "MaxConcurrency"
+    "MaxConcurrency",
 )
 
 case_type_names = {
