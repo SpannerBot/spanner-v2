@@ -318,7 +318,7 @@ class Info(commands.Cog):
                 f"**Name**: {discord.utils.escape_markdown(channel.name)}",
                 f"**ID**: `{channel.id}`",
                 f"**Category**: {channel.category.name if channel.category else 'No Category'}",
-                f"**Bitrate**: {channel.bitrate/1000}kbps",
+                f"**Bitrate**: {(channel.bitrate or 64000)/1000}kbps",
                 f"**In Chat Now**: {len(channel.members)}",
                 f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
                 f"**Permissions Synced**: {utils.Emojis.bool(channel.permissions_synced)}",
