@@ -144,8 +144,9 @@ class SimplePoll(orm.Model):
         id=orm.BigInteger(primary_key=True, default=lambda: round(time.time() - 1651425546)),
         channel_id=orm.BigInteger(default=None, allow_null=True),
         message=orm.BigInteger(allow_null=True, default=None),
+        guild_id=orm.BigInteger(default=None, allow_null=True),
         owner=orm.BigInteger(),
-        ends_at=orm.DateTime(),
+        ends_at=orm.Float(),
         voted=orm.JSON(default={}),
         ended=orm.Boolean(default=False),
     )
