@@ -76,7 +76,7 @@ class Info(commands.Cog):
                 user.id,
                 scopes=("bot", "applications.commands"),
             )
-            values.append(f"**Bot Invite**: {self.hyperlink(user.avatar.url)}")
+            values.append(f"**Bot Invite**: {self.hyperlink(link)}")
 
         if isinstance(user, discord.Member):
             if user.display_avatar != user.avatar:
