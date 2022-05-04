@@ -50,8 +50,7 @@ class Info(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot: Bot = bot
 
-    @staticmethod
-    def get_user_data(user: Union[discord.User, discord.Member], guild: discord.Guild = None):
+    def get_user_data(self, user: Union[discord.User, discord.Member], guild: discord.Guild = None):
         # noinspection PyUnresolvedReferences
         values = [
             f"**ID**: `{user.id}`",
@@ -67,12 +66,21 @@ class Info(commands.Cog):
             f"**Roles**: {len(user.roles):,}" if hasattr(user, "roles") else None,
             f"**Colour**: {user.colour}" if guild else None,
             f"**Top Role**: {user.top_role.mention}" if hasattr(user, "top_role") else None,
-            f"**Avatar URL**: {user.avatar.url}",
         ]
+
+        if user.avatar is not None:
+            values.append(f"**Avatar URL**: {self.hyperlink(user.avatar.url)}")
+
+        if user.bot is True:
+            link = discord.utils.oauth_url(
+                user.id,
+                scopes=("bot", "applications.commands"),
+            )
+            values.append(f"**Bot Invite**: {self.hyperlink(user.avatar.url)}")
 
         if isinstance(user, discord.Member):
             if user.display_avatar != user.avatar:
-                values.append("**Display Avatar**: %s" % user.display_avatar.url)
+                values.append("**Display Avatar**: %s" % self.hyperlink(user.display_avatar.url))
 
             if user.communication_disabled_until and user.communication_disabled_until >= discord.utils.utcnow():
                 values.append(f"**Timeout expires:** <t:{round(user.communication_disabled_until.timestamp())}:R>")
