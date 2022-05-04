@@ -312,42 +312,6 @@ class Info(commands.Cog):
             embed = discord.Embed(
                 title="%s%s" % (emoji, channel.name), description="\n".join(values), colour=discord.Colour.greyple()
             )
-        elif isinstance(channel, discord.VoiceChannel):
-            emoji = utils.Emojis.VOICE_CHANNEL
-            if channel.permissions_for(channel.guild.default_role).read_messages is False:
-                emoji = utils.Emojis.LOCKED_VOICE_CHANNEL
-
-            # noinspection PyUnresolvedReferences
-            values = [
-                f"**Name**: {discord.utils.escape_markdown(channel.name)}",
-                f"**ID**: `{channel.id}`",
-                f"**Category**: {channel.category.name if channel.category else 'No Category'}",
-                f"**Bitrate**: {channel.bitrate/1000}kbps",
-                f"**User Limit**: {channel.user_limit}",
-                f"**In Chat Now**: {len(channel.members)}",
-                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
-                f"**Permissions Synced**: {utils.Emojis.bool(channel.permissions_synced)}",
-                f"**Voice Region**: {channel.rtc_region.value if channel.rtc_region else 'Automatic'}",
-                f"**Video Quality**: {channel.video_quality_mode.value}",
-            ]
-            embed = discord.Embed(
-                title="%s%s" % (emoji, channel.name), description="\n".join(values), colour=discord.Colour.og_blurple()
-            )
-        elif isinstance(channel, discord.CategoryChannel):
-            values = [
-                f"**ID**: `{channel.id}`",
-                f"**Name**: {discord.utils.escape_markdown(channel.name)}",
-                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
-                f"**Position**: {channel.position}",
-                f"**Text Channels**: {len(channel.text_channels)}",
-                f"**Voice Channels**: {len(channel.voice_channels)}",
-                f"**Stage Channels**: {len(channel.stage_channels)}",
-            ]
-            embed = discord.Embed(
-                title="%s%s" % (utils.Emojis.CATEGORY, channel.name),
-                description="\n".join(values),
-                colour=discord.Colour.dark_grey(),
-            )
         elif isinstance(channel, discord.StageChannel):
             # noinspection PyUnresolvedReferences
             values = [
@@ -385,6 +349,42 @@ class Info(commands.Cog):
                 embed.add_field(name="Stage Moderators:", value="\n".join(moderators), inline=False)
                 embed.add_field(name="Stage Listeners:", value="\n".join(listening), inline=False)
                 embed.add_field(name="Stage Speakers:", value="\n".join(speaking), inline=False)
+        elif isinstance(channel, discord.VoiceChannel):
+            emoji = utils.Emojis.VOICE_CHANNEL
+            if channel.permissions_for(channel.guild.default_role).read_messages is False:
+                emoji = utils.Emojis.LOCKED_VOICE_CHANNEL
+
+            # noinspection PyUnresolvedReferences
+            values = [
+                f"**Name**: {discord.utils.escape_markdown(channel.name)}",
+                f"**ID**: `{channel.id}`",
+                f"**Category**: {channel.category.name if channel.category else 'No Category'}",
+                f"**Bitrate**: {(channel.bitrate or 64000) / 1000}kbps",
+                f"**User Limit**: {channel.user_limit}",
+                f"**In Chat Now**: {len(channel.members)}",
+                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
+                f"**Permissions Synced**: {utils.Emojis.bool(channel.permissions_synced)}",
+                f"**Voice Region**: {channel.rtc_region.value if channel.rtc_region else 'Automatic'}",
+                f"**Video Quality**: {channel.video_quality_mode.value}",
+            ]
+            embed = discord.Embed(
+                title="%s%s" % (emoji, channel.name), description="\n".join(values), colour=discord.Colour.og_blurple()
+            )
+        elif isinstance(channel, discord.CategoryChannel):
+            values = [
+                f"**ID**: `{channel.id}`",
+                f"**Name**: {discord.utils.escape_markdown(channel.name)}",
+                f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
+                f"**Position**: {channel.position}",
+                f"**Text Channels**: {len(channel.text_channels)}",
+                f"**Voice Channels**: {len(channel.voice_channels)}",
+                f"**Stage Channels**: {len(channel.stage_channels)}",
+            ]
+            embed = discord.Embed(
+                title="%s%s" % (utils.Emojis.CATEGORY, channel.name),
+                description="\n".join(values),
+                colour=discord.Colour.dark_grey(),
+            )
         else:
             return await ctx.respond("Unknown channel type.")
 
