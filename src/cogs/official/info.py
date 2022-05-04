@@ -170,8 +170,13 @@ class Info(commands.Cog):
         embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         return await ctx.respond(embed=embed)
 
-    @commands.user_command(name="User Info")
-    async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
+    @commands.slash_command(name="user-info")
+    async def user_info(
+            self,
+            ctx: discord.ApplicationContext,
+            user: discord.User = None
+    ):
+        """Shows you information about a user."""
         embeds = []
         user: Union[discord.User, discord.Member]
         user = user or ctx.user
@@ -253,6 +258,17 @@ class Info(commands.Cog):
             discord.abc.GuildChannel,
             description="The channel to get information on. Defaults to the current channel.",
             default=None,
+            channel_types=[
+                discord.ChannelType.text,
+                discord.ChannelType.voice,
+                discord.ChannelType.category,
+                discord.ChannelType.stage_voice,
+                discord.ChannelType.news,
+                discord.ChannelType.news_thread,
+                discord.ChannelType.private_thread,
+                discord.ChannelType.public_thread,
+                discord.ChannelType.forum
+            ]
         ),
     ):
         """Shows you information on a channel."""
