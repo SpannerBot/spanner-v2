@@ -323,7 +323,7 @@ class Info(commands.Cog):
                 f"**Created**: {discord.utils.format_dt(channel.created_at, 'R')}",
                 f"**Permissions Synced**: {utils.Emojis.bool(channel.permissions_synced)}",
                 f"**Voice Region**: {channel.rtc_region.value if channel.rtc_region else 'Automatic'}",
-                f"**Video Quality**: {channel.video_quality_mode.value}",
+                f"**Video Quality**: {channel.video_quality_mode.name}",
             ]
 
             embed = discord.Embed(
