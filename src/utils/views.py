@@ -1,12 +1,11 @@
 import datetime
-import os
 from typing import Dict, List, Optional
 
 import discord
 from discord.ext import pages, commands
-from discord.ui import View, Item, Button, Select, button, InputText, Modal
-from discord import ButtonStyle, InputTextStyle
-from src.database import Polls, SimplePoll
+from discord.ui import View, Button, Select, button, InputText, Modal
+from discord import ButtonStyle
+from src.database import SimplePoll
 
 
 __all__ = ("YesNoPrompt", "PollView", "CreatePollView", "CreateNewPollOption", "RemovePollOptionDropDown")
@@ -35,7 +34,7 @@ class SimplePollViewSeeResultsViewVotersView(View):
         self.voters = voters
 
     @button(label="View voters", style=ButtonStyle.green)
-    async def view_voters(self, btn: Button, interaction: discord.Interaction):
+    async def view_voters(self, _, interaction: discord.Interaction):
         if interaction.guild is None:
             return
         if interaction.user.guild_permissions.administrator:
@@ -45,17 +44,8 @@ class SimplePollViewSeeResultsViewVotersView(View):
             await interaction.guild.query_members(
                 user_ids=voted_yes + voted_no,
             )  # this caches them
-            voted_yes: List[Optional[discord.Member]] = list(
-                map(
-                    lambda x: interaction.guild.get_member(x),
-                    voted_yes
-                )
-            )
-            voted_no: List[Optional[discord.Member]] = list(
-                map(
-                    lambda x: interaction.guild.get_member(x), voted_no
-                )
-            )
+            voted_yes: List[Optional[discord.Member]] = list(map(lambda x: interaction.guild.get_member(x), voted_yes))
+            voted_no: List[Optional[discord.Member]] = list(map(lambda x: interaction.guild.get_member(x), voted_no))
             voted_yes: List[discord.Member] = list(filter(lambda x: x is not None, voted_yes))
             voted_no: List[discord.Member] = list(filter(lambda x: x is not None, voted_no))
 
@@ -94,9 +84,11 @@ class SimplePollView(View):
         return self.db
 
     @button(custom_id="yes", emoji="\N{white heavy check mark}")
-    async def confirm(self, btn: discord.Button, interaction: discord.Interaction):
+    async def confirm(self, _, interaction: discord.Interaction):
         db = await self.get_db()
-        if datetime.datetime.utcnow() >= db.ends_at:
+        ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
+        ends_at.replace(tzinfo=datetime.timezone.utc)
+        if datetime.datetime.utcnow() >= ends_at:
             for child in self.children:
                 if isinstance(child, Button):
                     if child.label in ("See results", "Delete poll"):
@@ -105,8 +97,7 @@ class SimplePollView(View):
             src_message = await interaction.channel.fetch_message(db.message)
             await src_message.edit(view=self)
             return await interaction.response.send_message(
-                f"This poll ended {discord.utils.format_dt(db.ends_at, 'R')}"
-                f"\nPress 'See results' to see the results.",
+                f"This poll ended {discord.utils.format_dt(ends_at, 'R')}" f"\nPress 'See results' to see the results.",
                 ephemeral=True,
             )
         if str(interaction.user.id) in db.voted.keys():
@@ -117,9 +108,11 @@ class SimplePollView(View):
             await interaction.response.send_message("You voted \N{WHITE HEAVY CHECK MARK}!", ephemeral=True)
 
     @button(custom_id="no", emoji="\N{cross mark}")
-    async def deny(self, btn: discord.Button, interaction: discord.Interaction):
+    async def deny(self, _, interaction: discord.Interaction):
         db = await self.get_db()
-        if datetime.datetime.utcnow() >= db.ends_at:
+        ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
+        ends_at.replace(tzinfo=datetime.timezone.utc)
+        if datetime.datetime.utcnow() >= ends_at:
             for child in self.children:
                 if isinstance(child, Button):
                     if child.label in ("See results", "Delete poll"):
@@ -128,8 +121,7 @@ class SimplePollView(View):
             src_message = await interaction.channel.fetch_message(db.message)
             await src_message.edit(view=self)
             return await interaction.response.send_message(
-                f"This poll ended {discord.utils.format_dt(db.ends_at, 'R')}"
-                f"\nPress 'See results' to see the results.",
+                f"This poll ended {discord.utils.format_dt(ends_at, 'R')}" f"\nPress 'See results' to see the results.",
                 ephemeral=True,
             )
         if str(interaction.user.id) in db.voted.keys():
@@ -140,7 +132,7 @@ class SimplePollView(View):
             await interaction.response.send_message("You voted \N{cross mark}!", ephemeral=True)
 
     @button(custom_id="view", label="See results", emoji="\N{eyes}", row=2)
-    async def view_results(self, btn: discord.Button, interaction: discord.Interaction):
+    async def view_results(self, _, interaction: discord.Interaction):
         db = await self.get_db()
         total_yes = len([x for x in db.voted.values() if x])
         total_no = len([x for x in db.voted.values() if not x])
@@ -156,7 +148,8 @@ class SimplePollView(View):
         else:
             colour = discord.Colour.blue()
 
-        ends_at = datetime.datetime.fromtimestamp(db.ends_at.timestamp(), tz=datetime.timezone.utc)
+        ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
+        ends_at.replace(tzinfo=datetime.timezone.utc)
         viewable = sum(1 for x in interaction.message.channel.members if x.bot is False)
 
         embed = discord.Embed(
@@ -169,7 +162,7 @@ class SimplePollView(View):
             colour=colour,
         )
 
-        if interaction.user.id == db.owner or datetime.datetime.utcnow() >= db.ends_at:
+        if interaction.user.id == db.owner or datetime.datetime.utcnow() >= ends_at:
             _view = SimplePollViewSeeResultsViewVotersView(self.db.voted)
             if not interaction.user.guild_permissions.administrator:
                 _view = None
@@ -178,7 +171,7 @@ class SimplePollView(View):
             return await interaction.response.send_message("You cannot view results yet!", ephemeral=True)
 
     @button(custom_id="delete", label="Delete poll", style=ButtonStyle.red, emoji="\N{wastebasket}\U0000fe0f", row=2)
-    async def delete(self, btn: discord.Button, interaction: discord.Interaction):
+    async def delete(self, _, interaction: discord.Interaction):
         db = await self.get_db()
         if interaction.user.id != db.owner:
             return await interaction.response.send_message("You can't delete this poll!", ephemeral=True)
@@ -226,22 +219,22 @@ class CreatePollView(View):
         super().__init__(*args, **kwargs)
 
     @button(label="Add new option", style=ButtonStyle.green, emoji="\N{HEAVY PLUS SIGN}")
-    async def add_new_option(self, btn: discord.Button, interaction: discord.Interaction):
+    async def add_new_option(self, *_):
         self.value = "ADD_NEW"
         self.stop()
 
     @button(label="Remove an option", style=ButtonStyle.red, emoji="\N{HEAVY MINUS SIGN}")
-    async def remove_option(self, btn: discord.Button, interaction: discord.Interaction):
+    async def remove_option(self, *_):
         self.value = "REMOVE"
         self.stop()
 
     @button(label="Create", style=ButtonStyle.green, emoji="\N{WHITE HEAVY CHECK MARK}")
-    async def finish(self, *args):
+    async def finish(self, *_):
         self.value = "DONE"
         self.stop()
 
     @button(label="Cancel", style=ButtonStyle.red)
-    async def cancel(self, btn: discord.Button, interaction: discord.Interaction):
+    async def cancel(self, *_):
         self.value = "STOP"
         self.stop()
 

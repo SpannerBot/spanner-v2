@@ -12,6 +12,7 @@ import discord
 from discord import SlashCommandGroup
 from discord.commands import Option
 from discord.ext import commands, pages, tasks
+from orm import NoMatch
 
 from src import utils
 from src.bot.client import Bot
@@ -69,7 +70,8 @@ class Utility(commands.Cog):
     async def poll_expire_loop(self):
         # NOTE: This function has very lazy error handling. If you're afraid of that, skip it :D
         await self.bot.wait_until_ready()
-        for expired_poll in await SimplePoll.objects.filter(ends_at__lte=discord.utils.utcnow(), ended=False).all():
+        now = discord.utils.utcnow().timestamp()
+        for expired_poll in await SimplePoll.objects.filter(ends_at__lte=now, ended=False).all():
             self.bot.console.log("Expired poll: %s" % expired_poll)
             channel = self.bot.get_channel(expired_poll.channel_id)
             if channel is None:
@@ -114,6 +116,27 @@ class Utility(commands.Cog):
         for message in messages:
             logger.debug("Processing message delete for message %s-%s", message.channel.id, message.id)
             await self.on_message_delete(message)
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, message: discord.RawMessageDeleteEvent):
+        try:
+            entry = await SimplePoll.objects.get(message=message.message_id)
+        except NoMatch:
+            pass
+        else:
+            await entry.delete()
+
+    @commands.Cog.listener()
+    async def on_channel_delete(self, channel: discord.abc.GuildChannel):
+        polls = await SimplePoll.objects.filter(channel_id=channel.id).all()
+        for poll in polls:
+            await poll.delete()
+
+    @commands.Cog.listener()
+    async def on_guild_remove(self, guild: discord.Guild):
+        polls = await SimplePoll.objects.filter(guild_id=guild.id).all()
+        for poll in polls:
+            await poll.delete()
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -314,7 +337,9 @@ class Utility(commands.Cog):
             description=f"Poll closes {discord.utils.format_dt(poll_closes, 'R')}.",
         )
         embed.set_author(name="%s asks..." % ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
-        entry = await SimplePoll.objects.create(ends_at=poll_closes, owner=ctx.author.id)
+        entry = await SimplePoll.objects.create(
+            ends_at=poll_closes.timestamp(), owner=ctx.author.id, guild_id=ctx.guild.id
+        )
         view = SimplePollView(entry.id)
         embed.set_footer(text="Poll ID: %s" % entry.id)
         message = await ctx.send(embed=embed, view=view)
