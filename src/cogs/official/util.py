@@ -340,7 +340,7 @@ class Utility(commands.Cog):
         entry = await SimplePoll.objects.create(
             ends_at=poll_closes.timestamp(), owner=ctx.author.id, guild_id=ctx.guild.id
         )
-        view = SimplePollView(entry.id)
+        view = SimplePollView(entry.id, ctx.interaction)
         embed.set_footer(text="Poll ID: %s" % entry.id)
         message = await ctx.send(embed=embed, view=view)
         await entry.update(message=message.id, channel_id=message.channel.id)

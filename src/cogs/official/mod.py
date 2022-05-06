@@ -125,7 +125,7 @@ class Moderation(commands.Cog):
         if await discord.utils.get_or_fetch(ctx.guild, "member", user.id, default=None):
             return await ctx.respond("User is already in the server. Please use regular /ban.", ephemeral=True)
 
-        view = YesNoPrompt(timeout=300.0)
+        view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond(
             embed=discord.Embed(
                 title="Are you sure you want to hackban {!s}?".format(user), colour=discord.Colour.orange()
@@ -191,7 +191,7 @@ class Moderation(commands.Cog):
                 colour=discord.Colour.orange(),
             )
             embed.set_footer(text=str(ban.user), icon_url=ban.user.avatar.url)
-            view = YesNoPrompt(timeout=300.0)
+            view = YesNoPrompt(ctx.interaction, timeout=300.0)
             await ctx.respond(embed=embed, view=view, ephemeral=True)
             await view.wait()
             if not view.confirm:
@@ -232,7 +232,7 @@ class Moderation(commands.Cog):
             await ctx.guild.fetch_ban(member)
             return await ctx.respond("User is already banned.", ephemeral=True)
         except discord.NotFound:
-            view = YesNoPrompt(timeout=300.0)
+            view = YesNoPrompt(ctx.interaction, timeout=300.0)
             await ctx.respond(
                 embed=discord.Embed(
                     title="Are you sure you want to ban {!s}?".format(member), colour=discord.Colour.orange()
@@ -276,7 +276,7 @@ class Moderation(commands.Cog):
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
-        view = YesNoPrompt(timeout=300.0)
+        view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond(
             embed=discord.Embed(
                 title="Are you sure you want to kick {!s}?".format(member), colour=discord.Colour.orange()
@@ -338,7 +338,7 @@ class Moderation(commands.Cog):
                     "You can't mute a user for more than 28 days or less than 1 minute.", ephemeral=True
                 )
 
-        view = YesNoPrompt(timeout=300.0)
+        view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond(
             f"Are you sure you want to mute {member} until <t:{round(end.timestamp())}>?", ephemeral=True, view=view
         )
@@ -385,7 +385,7 @@ class Moderation(commands.Cog):
 
         end = member.communication_disabled_until
 
-        view = YesNoPrompt(timeout=300.0)
+        view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond(
             f"Are you sure you want to unmute {member}?"
             + (f" Their current mute will automatically expire <t:{round(end.timestamp())}:R>" if end else ""),
@@ -436,7 +436,7 @@ class Moderation(commands.Cog):
         except NoMatch:
             return await ctx.respond("Case not found.", ephemeral=True)
 
-        view = YesNoPrompt(timeout=300.0)
+        view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond("Are you sure you would like to delete case #{!s}?".format(case.entry_id), view=view)
         await view.wait()
         if not view.confirm:

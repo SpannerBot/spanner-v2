@@ -686,7 +686,7 @@ class Info(commands.Cog):
                         if len(ctx.guild.emojis) < ctx.guild.emoji_limit:
                             if getattr(emoji_full, "guild", None) != ctx.guild:
                                 if discord.utils.get(ctx.guild.emojis, name=emoji.name) is None:
-                                    view = StealEmojiView(emoji)
+                                    view = StealEmojiView(ctx.interaction, emoji=emoji_full or emoji)
             return await ctx.respond(embed=e, view=view)
 
 

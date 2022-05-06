@@ -9,10 +9,24 @@ from discord import ButtonStyle
 from src.database import SimplePoll
 
 
-__all__ = ("YesNoPrompt", "PollView", "CreatePollView", "CreateNewPollOption", "RemovePollOptionDropDown")
+__all__ = ("YesNoPrompt", "SimplePollViewSeeResultsViewVotersView", "SimplePollView")
 
 
-class YesNoPrompt(View):
+class AutoDisableView(View):
+    interaction: discord.Interaction = None
+
+    def __init__(self, interaction: discord.Interaction = None, *args, **kwargs):
+        super().__init__(**kwargs)
+        self.interaction = interaction
+
+    async def on_timeout(self) -> None:
+        self.disable_all_items()
+        if self.interaction is not None and self.interaction.message is not None:
+            await self.interaction.message.edit(view=self)
+        self.stop()
+
+
+class YesNoPrompt(AutoDisableView):
     confirm: bool = False
 
     def __init__(self, *args, **kwargs):
@@ -28,10 +42,10 @@ class YesNoPrompt(View):
         self.stop()
 
 
-class SimplePollViewSeeResultsViewVotersView(View):
+class SimplePollViewSeeResultsViewVotersView(AutoDisableView):
     # what the fuck
-    def __init__(self, voters: Dict[str, bool]):
-        super().__init__()
+    def __init__(self, voters: Dict[str, bool], *args):
+        super().__init__(*args)
         self.voters = voters
 
     @button(label="View voters", style=ButtonStyle.green)
@@ -72,9 +86,9 @@ class SimplePollViewSeeResultsViewVotersView(View):
             await interaction.response.send_message("Only administrators can view voters.", ephemeral=True)
 
 
-class SimplePollView(View):
-    def __init__(self, poll_id: int):
-        super().__init__(timeout=None)
+class SimplePollView(AutoDisableView):
+    def __init__(self, poll_id: int, *args):
+        super().__init__(*args, timeout=None)
         self.poll_id = poll_id
         self.db = None
 
@@ -164,7 +178,7 @@ class SimplePollView(View):
         )
 
         if interaction.user.id == db.owner or datetime.datetime.utcnow() >= ends_at:
-            _view = SimplePollViewSeeResultsViewVotersView(self.db.voted)
+            _view = SimplePollViewSeeResultsViewVotersView(self.db.voted, interaction)
             if not interaction.user.guild_permissions.administrator:
                 _view = None
             return await interaction.response.send_message(embed=embed, ephemeral=True, view=_view)
@@ -183,104 +197,9 @@ class SimplePollView(View):
             self.stop()
 
 
-class PollView(View):
-    class PollButton(Button):
-        def __init__(self, label: str, index: int):
-            super().__init__(label=label, style=ButtonStyle.grey)
-            self.index = index
-
-        async def callback(self, interaction: discord.Interaction):
-            await interaction.response.defer(ephemeral=True)
-            if str(interaction.user.id) in self.view.entry.results.keys():
-                return await interaction.response.send_message("You already voted in this poll.", ephemeral=True)
-            else:
-                yn = YesNoPrompt(120)
-                message = await interaction.followup.send(
-                    "Would you like to vote for this option? You cannot go back!", view=yn, ephemeral=True
-                )
-                await yn.wait()
-                if yn.confirm is False:
-                    return await message.edit("You have cancelled your vote.", view=None)
-                else:
-                    self.view.entry.results[str(interaction.user.id)] = self.index
-                    await self.view.entry.update(results=self.view.entry.results)
-                    await message.edit("You have voted for option {}.".format(self.index), view=None)
-
-    def __init__(self, poll_entry, options: list):
-        super().__init__(timeout=None)
-        self.entry = poll_entry
-        for option in options:
-            self.add_item(self.PollButton(label=option, index=options.index(option)))
-
-
-class CreatePollView(View):
-    value: str = ""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    @button(label="Add new option", style=ButtonStyle.green, emoji="\N{HEAVY PLUS SIGN}")
-    async def add_new_option(self, *_):
-        self.value = "ADD_NEW"
-        self.stop()
-
-    @button(label="Remove an option", style=ButtonStyle.red, emoji="\N{HEAVY MINUS SIGN}")
-    async def remove_option(self, *_):
-        self.value = "REMOVE"
-        self.stop()
-
-    @button(label="Create", style=ButtonStyle.green, emoji="\N{WHITE HEAVY CHECK MARK}")
-    async def finish(self, *_):
-        self.value = "DONE"
-        self.stop()
-
-    @button(label="Cancel", style=ButtonStyle.red)
-    async def cancel(self, *_):
-        self.value = "STOP"
-        self.stop()
-
-
-class CreateNewPollOption(Modal):
-    def __init__(self):
-        super().__init__(
-            title="Create new poll option",
-        )
-        self.value = None
-        self.text_input = InputText(label="Option value", min_length=1, max_length=100, required=True)
-        self.add_item(self.text_input)
-
-    async def callback(self, interaction: discord.Interaction):
-        self.value = self.text_input.value
-        self.stop()
-
-    async def run(self) -> str:
-        await self.wait()
-        return self.value
-
-
-class RemovePollOptionDropDown(View):
-    class SelectOption(Select):
-        def __init__(self, choices: list):
-            super().__init__(min_values=1, max_values=len(choices) - 1)
-            self.choices = choices
-            for opt in choices:
-                self.add_option(label=opt, value=str(choices.index(opt)), emoji="\N{cross mark}")
-
-        async def callback(self, interaction: discord.Interaction):
-            for choice in self.values:
-                self.choices.pop(int(choice))
-            self.view.value = self.choices
-            self.view.stop()
-
-    def __init__(self, options: list):
-        super().__init__()
-        self.value = None
-        self.add_item(self.SelectOption(options))
-
-
-class StealEmojiView(View):
-    def __init__(self, emoji: Union[discord.Emoji, discord.PartialEmoji]):
-        super().__init__(timeout=300)
+class StealEmojiView(AutoDisableView):
+    def __init__(self, *args, emoji: Union[discord.Emoji, discord.PartialEmoji]):
+        super().__init__(*args, timeout=300)
         self.emoji = emoji
 
     @button(label="Steal", style=ButtonStyle.green, emoji="\U00002b07\U0000fe0f")

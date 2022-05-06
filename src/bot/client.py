@@ -310,7 +310,7 @@ class Bot(commands.Bot):
     async def start(self, token: str, *, reconnect: bool = True) -> None:
         for poll in await SimplePoll.objects.all():
             self.console.log("Registering poll %s to permanent view" % poll.id)
-            view = SimplePollView(poll.id)
+            view = SimplePollView(poll.id, None)
             self.add_view(view, message_id=poll.message)
         self.console.log("Waiting for network...")
         await self.wait_for_network()
