@@ -1,5 +1,6 @@
 import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
+from io import BytesIO
 
 import discord
 from discord.ext import pages, commands
@@ -275,3 +276,51 @@ class RemovePollOptionDropDown(View):
         super().__init__()
         self.value = None
         self.add_item(self.SelectOption(options))
+
+
+class StealEmojiView(View):
+    def __init__(self, emoji: Union[discord.Emoji, discord.PartialEmoji]):
+        super().__init__(timeout=300)
+        self.emoji = emoji
+
+    @button(label="Steal", style=ButtonStyle.green, emoji="\U00002b07\U0000fe0f")
+    async def steal_emoji(self, btn: discord.Button, interaction: discord.Interaction):
+        if not interaction.user.guild:
+            btn.disabled = True
+            await interaction.message.edit(view=self)
+            await interaction.response.send_message("You should not be able to see this button in DMs?")
+            self.stop()
+            return
+
+        if not interaction.user.guild_permissions.manage_emojis:
+            return await interaction.response.send_message("You need to have manage emojis permission to steal emojis.")
+        if not interaction.user.guild.me.guild_permissions.manage_emojis:
+            return await interaction.response.send_message("I need to have manage emojis permission to steal emojis.")
+        if len(interaction.guild.emojis) >= interaction.guild.emoji_limit:
+            return await interaction.response.send_message(
+                "You can't have more than {:,} emojis in this server.".format(interaction.guild.emoji_limit)
+            )
+
+        await interaction.response.defer()
+
+        # Create a buffer and save the emoji to it
+        buffer = BytesIO()
+        await self.emoji.save(buffer)  # save emoji to buffer
+        buffer.seek(0)  # reset buffer to read from it again
+        # create the emoji in the server with the same info
+        try:
+            new_emoji = await interaction.guild.create_custom_emoji(
+                name=self.emoji.name,
+                image=buffer.read(),
+                reason="Stolen by {!s} from {!s}.".format(
+                    interaction.user,
+                    "%r" % interaction.guild.name if interaction.guild else "an unknown server",
+                ),
+            )
+        except discord.HTTPException as e:
+            return await interaction.response.send_message("Something went wrong while creating the emoji.\n" + str(e))
+        else:
+            btn.disabled = True
+            await interaction.message.edit(view=self)
+            await interaction.followup.send(f"Emoji stolen! `{new_emoji!s}`")
+            self.stop()

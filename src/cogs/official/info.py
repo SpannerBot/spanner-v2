@@ -14,6 +14,7 @@ from discord.ext import commands
 
 from src import utils
 from src.bot.client import Bot
+from src.utils.views import StealEmojiView
 
 verification_levels = {
     discord.VerificationLevel.none: "Unrestricted",
@@ -179,11 +180,7 @@ class Info(commands.Cog):
         return await ctx.respond(embed=embed)
 
     @commands.slash_command(name="user-info")
-    async def user_info(
-            self,
-            ctx: discord.ApplicationContext,
-            user: discord.User = None
-    ):
+    async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
         """Shows you information about a user."""
         embeds = []
         user: Union[discord.User, discord.Member]
@@ -275,8 +272,8 @@ class Info(commands.Cog):
                 discord.ChannelType.news_thread,
                 discord.ChannelType.private_thread,
                 discord.ChannelType.public_thread,
-                discord.ChannelType.forum
-            ]
+                discord.ChannelType.forum,
+            ],
         ),
     ):
         """Shows you information on a channel."""
@@ -640,11 +637,15 @@ class Info(commands.Cog):
 
     @commands.slash_command(name="emoji-info")
     async def emoji_info(self, ctx: discord.ApplicationContext, emoji: str):
+        """Shows you information on an emoji, both built-in (e.g. faces) and custom ones."""
         try:
             # noinspection PyTypeChecker
             emoji = await commands.PartialEmojiConverter().convert(ctx, emoji)
         except commands.PartialEmojiConversionFailure:
             paginator = commands.Paginator(prefix="", suffix="", max_size=4069)
+            paginator.add_line(
+                "Emoji was not detected as a custom emoji. Assuming you wanted the unicode information.", empty=True
+            )
 
             def to_string(_chr):
                 digit = f"{ord(_chr):x}"
@@ -658,20 +659,35 @@ class Info(commands.Cog):
                 embeds.append(discord.Embed(description=page))
             return await ctx.respond(embeds=embeds)
         else:
-            u200b = "\u200b"
             e = discord.Embed(
                 title=f"{emoji.name}'s info:",
                 description=f"**Name:** {emoji.name}\n"
                 f"**ID:** {emoji.id}\n"
-                f"**Format:** `{str(emoji).replace(':', u200b + ':')}`\n"
+                f"**Created:** {discord.utils.format_dt(emoji.created_at, 'R')}\n"
+                f"**Format:** `{str(emoji)}`\n"
                 f"**Animated?:** {utils.Emojis.bool(emoji.animated)}\n"
                 f"**Custom?:** {utils.Emojis.bool(emoji.is_custom_emoji())}\n"
                 f"**URL:** {self.hyperlink(emoji.url)}\n",
                 color=discord.Colour.orange(),
                 timestamp=emoji.created_at,
             )
+            try:
+                # noinspection PyTypeChecker
+                emoji_full = await commands.EmojiConverter().convert(ctx, str(emoji.id))
+            except commands.EmojiNotFound:
+                emoji_full = None
+            else:
+                e.description += f"**Server name:** {emoji_full.guild.name if emoji_full.guild else 'N/A'}\n"
             e.set_image(url=str(emoji.url))
-            return await ctx.respond(embed=e)
+            view = None
+            if ctx.guild:
+                if ctx.author.guild_permissions.manage_emojis:
+                    if ctx.author.guild_permissions.manage_emojis:
+                        if len(ctx.guild.emojis) < ctx.guild.emoji_limit:
+                            if getattr(emoji_full, "guild", None) != ctx.guild:
+                                if discord.utils.get(ctx.guild.emojis, name=emoji.name) is None:
+                                    view = StealEmojiView(emoji)
+            return await ctx.respond(embed=e, view=view)
 
 
 def setup(bot):
