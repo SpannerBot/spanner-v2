@@ -8,7 +8,7 @@ from discord import SlashCommandGroup
 from discord.ext import commands, pages
 
 from src.database import Cases, CaseType, Guild, NoMatch
-from src.utils import utils, converters
+from src.utils import utils
 from src.utils.views import YesNoPrompt
 
 
@@ -59,14 +59,16 @@ class Moderation(commands.Cog):
                         reason="You cannot perform actions on users with a higher or equal role than me."
                     )
             # Step 2.3: Check if the author has the required permissions.
-            if getattr(author.guild_permissions, permission_name) is False:
-                raise PermissionsError(
-                    reason="You do not have the required permissions to perform this action "
-                    f"(hint: {permission_name.replace('_', ' ')!r})."
-                )
+            # if getattr(author.guild_permissions, permission_name) is False:
+            #     raise PermissionsError(
+            #         reason="You do not have the required permissions to perform this action "
+            #         f"(hint: {permission_name.replace('_', ' ')!r})."
+            #     )
+            # Made obsolete by default_permissions
         return True
 
     @commands.slash_command(name="warn")
+    @discord.default_permissions(moderate_members=True)
     async def warn(
         self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided."
     ):
@@ -109,6 +111,7 @@ class Moderation(commands.Cog):
         return await ctx.respond(content, ephemeral=True)
 
     @commands.slash_command(name="hackban")
+    @discord.default_permissions(ban_members=True)
     async def hackban(
         self,
         ctx: discord.ApplicationContext,
@@ -161,6 +164,7 @@ class Moderation(commands.Cog):
             )
 
     @commands.slash_command(name="unban")
+    @discord.default_permissions(ban_members=True)
     async def unban(
         self,
         ctx: discord.ApplicationContext,
@@ -213,6 +217,7 @@ class Moderation(commands.Cog):
                 )
 
     @commands.slash_command(name="ban")
+    @discord.default_permissions(ban_members=True)
     async def ban(
         self,
         ctx: discord.ApplicationContext,
@@ -268,6 +273,7 @@ class Moderation(commands.Cog):
                 )
 
     @commands.slash_command(name="kick")
+    @discord.default_permissions(kick_members=True)
     async def kick(
         self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided"
     ):
@@ -312,6 +318,7 @@ class Moderation(commands.Cog):
             )
 
     @commands.slash_command(name="mute")
+    @discord.default_permissions(moderate_members=True)
     async def mute(
         self,
         ctx: discord.ApplicationContext,
@@ -377,6 +384,7 @@ class Moderation(commands.Cog):
             )
 
     @commands.slash_command(name="unmute")
+    @discord.default_permissions(moderate_members=True)
     async def unmute(self, ctx: discord.ApplicationContext, member: discord.Member, reason: str = "No Reason Provided"):
         try:
             self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
@@ -421,7 +429,9 @@ class Moderation(commands.Cog):
                 content=f"User {member} has been unmuted.\n" f"Case ID: {case.id!s}", embed=None, view=None
             )
 
-    cases_group = SlashCommandGroup("cases", "Case management")
+    cases_group = SlashCommandGroup(
+        "cases", "Case management", default_member_permissions=discord.Permissions(moderate_members=True)
+    )
 
     @cases_group.command(name="delete")
     async def delete_case(self, ctx: discord.ApplicationContext, case_id: int):

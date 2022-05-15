@@ -215,18 +215,16 @@ class StealEmojiView(AutoDisableView):
 
         if not interaction.user.guild_permissions.manage_emojis:
             return await interaction.response.send_message(
-                "You need to have manage emojis permission to steal emojis.",
-                ephemeral=ephemeral
+                "You need to have manage emojis permission to steal emojis.", ephemeral=ephemeral
             )
         if not interaction.user.guild.me.guild_permissions.manage_emojis:
             return await interaction.response.send_message(
-                "I need to have manage emojis permission to steal emojis.",
-                ephemeral=ephemeral
+                "I need to have manage emojis permission to steal emojis.", ephemeral=ephemeral
             )
         if len(interaction.guild.emojis) >= interaction.guild.emoji_limit:
             return await interaction.response.send_message(
                 "You can't have more than {:,} emojis in this server.".format(interaction.guild.emoji_limit),
-                ephemeral=ephemeral
+                ephemeral=ephemeral,
             )
 
         await interaction.response.defer(ephemeral=ephemeral)
@@ -247,14 +245,10 @@ class StealEmojiView(AutoDisableView):
             )
         except discord.HTTPException as e:
             return await interaction.response.send_message(
-                "Something went wrong while creating the emoji.\n" + str(e),
-                ephemeral=ephemeral
+                "Something went wrong while creating the emoji.\n" + str(e), ephemeral=ephemeral
             )
         else:
             btn.disabled = True
             await interaction.message.edit(view=self)
-            await interaction.followup.send(
-                f"Emoji stolen! `{new_emoji!s}`",
-                ephemeral=ephemeral
-            )
+            await interaction.followup.send(f"Emoji stolen! `{new_emoji!s}`", ephemeral=ephemeral)
             self.stop()
