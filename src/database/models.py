@@ -17,7 +17,6 @@ __all__ = (
     "Errors",
     "CommandType",
     "DB_STAT",
-    "Polls",
     "SimplePoll",
 )
 
@@ -103,16 +102,10 @@ class Errors(orm.Model):
 
     @staticmethod
     def calculate_next_case_id():
-        now = discord.utils.utcnow()
-
-        global DB_STAT
-        if DB_STAT is None:
-            DB_STAT = datetime.fromtimestamp((Path.cwd() / "main.db").stat().st_ctime, timezone.utc)
-
-        return round(now.timestamp()) - round(DB_STAT.timestamp())
+        return discord.utils.generate_snowflake()
 
     fields = dict(
-        id=orm.Integer(primary_key=True, default=lambda: round(discord.utils.utcnow().timestamp()) - 1646065759),
+        id=orm.Integer(primary_key=True, default=discord.utils.generate_snowflake),
         traceback_text=orm.Text(),
         author=orm.BigInteger(),
         guild=orm.BigInteger(allow_null=True),
@@ -125,23 +118,10 @@ class Errors(orm.Model):
     )
 
 
-class Polls(orm.Model):
-    registry = models
-    fields = dict(
-        id=orm.BigInteger(primary_key=True),
-        guild=orm.ForeignKey(Guild),
-        channel=orm.BigInteger(),
-        message=orm.BigInteger(),
-        options=orm.JSON(),  # list
-        results=orm.JSON(),  # dictionary
-        ends_at=orm.DateTime(),
-    )
-
-
 class SimplePoll(orm.Model):
     registry = models
     fields = dict(
-        id=orm.BigInteger(primary_key=True, default=lambda: round(time.time() - 1651425546)),
+        id=orm.BigInteger(primary_key=True, default=discord.utils.generate_snowflake),
         channel_id=orm.BigInteger(default=None, allow_null=True),
         message=orm.BigInteger(allow_null=True, default=None),
         guild_id=orm.BigInteger(default=None, allow_null=True),

@@ -6,7 +6,7 @@ import textwrap
 import traceback
 import warnings
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Type
 
 import discord
 import httpx
@@ -164,9 +164,6 @@ class Bot(commands.Bot):
         else:
             self.console.log("[red]Failed to connect: Unknown error: %r" % error)
 
-    async def sync_commands(self, *args, **kwargs) -> None:
-        return await super().sync_commands(*args, **kwargs)
-
     async def register_command(
         self, command: ApplicationCommand, force: bool = True, guild_ids: List[int] = None
     ) -> None:
@@ -183,7 +180,7 @@ class Bot(commands.Bot):
         self.console.log("Bot is logged in to discord!")
         logger.info("Logged in to discord as %s." % self.user)
         self.console.log(
-            "User: [link=%s]%s[/]"
+            "User: [link=%r]%s[/]"
             % (
                 discord.utils.oauth_url(self.user.id, scopes="bot+applications.commands"),
                 self.user,
@@ -260,6 +257,17 @@ class Bot(commands.Bot):
     async def on_application_command_error(
         self, context: discord.ApplicationContext, exception: discord.DiscordException
     ) -> None:
+        static_errors: Dict[Type[discord.DiscordException], str] = {
+            commands.MissingPermissions: "You do not have permission to run this command.\n'{e!s}'",
+            commands.NotOwner: "This command is owner-only.",
+            commands.BotMissingPermissions: "I do not have permission to run this command.\n'{e!s}'",
+            commands.CommandOnCooldown: "This command is on cooldown.\n'{e!s}'",
+            commands.MaxConcurrencyReached: "This command is currently running too many times.\n'{e!s}'",
+        }
+        if isinstance(exception, tuple(static_errors.keys())):
+            await context.respond(static_errors[type(exception)].format(ctx=context, e=exception), ephemeral=True)
+            return
+
         error = exception
         traceback.print_exception(type(error), error, error.__traceback__)
         exception = getattr(exception, "original", exception)

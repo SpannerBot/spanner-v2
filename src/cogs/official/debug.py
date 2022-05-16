@@ -1,4 +1,5 @@
 import asyncio
+import io
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -72,13 +73,12 @@ class Debug(commands.Cog):
         )
 
     @bridge.bridge_command(name="ping")
-    @permissions.is_owner()
     async def ping(self, ctx: discord.ApplicationContext):
         """Shows the bot's latency."""
         await ctx.respond(f"Pong! {round(self.bot.latency * 1000, 2)}ms")
 
     @commands.slash_command(name="clean")
-    async def clean_bot_message(self, ctx: discord.ApplicationContext, max_search: int = 1000):
+    async def clean_bot_message(self, ctx: discord.ApplicationContext, max_search: discord.Option(int, default=100)):
         """Deletes all messages sent by the bot up to <max_search> messages."""
         if ctx.author.id not in self.bot.owner_ids:
             if not ctx.channel.permissions_for(ctx.author).manage_messages:
@@ -128,8 +128,8 @@ class Debug(commands.Cog):
         url = discord.utils.oauth_url(self.bot.user.id, scopes=("bot", "applications.commands"))
         await ctx.respond(f'[Did you know you can click on my profile and click "add to server"?]({url})')
 
-    @commands.slash_command()
-    @permissions.is_owner()
+    @commands.command()
+    @commands.is_owner()
     async def err(self, ctx, ephemeral: bool = False):
         """Raises an error."""
         await ctx.defer(ephemeral=ephemeral)
@@ -142,7 +142,7 @@ class Debug(commands.Cog):
         case_id: discord.Option(
             int, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)
         ),
-        ephemeral: bool = True,
+        ephemeral: discord.Option(bool, "Whether to send the error message as an ephemeral message", default=False),
     ):
         """Fetches an error case"""
         if not await self.bot.is_owner(ctx.user):
@@ -205,6 +205,31 @@ class Debug(commands.Cog):
 
             paginator = pagination.Paginator(pages, show_disabled=False, timeout=300, custom_view=CustomView())
             await paginator.respond(ctx.interaction, ephemeral=ephemeral)
+
+    @commands.command()
+    @commands.is_owner()
+    async def trace(self, ctx: commands.Context, *, seconds: int = 30):
+        if seconds % 5:
+            return await ctx.send("Seconds must be a multiple of 5.")
+
+        from src.utils import Tracer
+        t = Tracer(self.bot)
+        message = await ctx.send("Tracing...")
+        t.start()
+        async with ctx.channel.typing():
+            await asyncio.sleep(seconds)
+        data = io.BytesIO()
+        t.stop(data)
+        data.seek(0)
+        try:
+            await message.edit(
+                content="Trace complete.\n",
+                file=discord.File(data, filename="trace.json"),
+            )
+        except discord.HTTPException:
+            return
+        finally:
+            del t
 
 
 def setup(bot):

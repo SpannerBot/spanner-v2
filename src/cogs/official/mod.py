@@ -58,13 +58,6 @@ class Moderation(commands.Cog):
                     raise PermissionsError(
                         reason="You cannot perform actions on users with a higher or equal role than me."
                     )
-            # Step 2.3: Check if the author has the required permissions.
-            # if getattr(author.guild_permissions, permission_name) is False:
-            #     raise PermissionsError(
-            #         reason="You do not have the required permissions to perform this action "
-            #         f"(hint: {permission_name.replace('_', ' ')!r})."
-            #     )
-            # Made obsolete by default_permissions
         return True
 
     @commands.slash_command(name="warn")
@@ -112,6 +105,8 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="hackban")
     @discord.default_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
+    @commands.bot_has_permissions(ban_members=True)
     async def hackban(
         self,
         ctx: discord.ApplicationContext,
@@ -165,6 +160,8 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="unban")
     @discord.default_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
+    @commands.bot_has_permissions(ban_members=True)
     async def unban(
         self,
         ctx: discord.ApplicationContext,
@@ -218,6 +215,8 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="ban")
     @discord.default_permissions(ban_members=True)
+    @commands.has_permissions(ban_members=True)
+    @commands.bot_has_permissions(ban_members=True)
     async def ban(
         self,
         ctx: discord.ApplicationContext,
@@ -274,6 +273,8 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="kick")
     @discord.default_permissions(kick_members=True)
+    @commands.has_permissions(kick_members=True)
+    @commands.bot_has_permissions(kick_members=True)
     async def kick(
         self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided"
     ):

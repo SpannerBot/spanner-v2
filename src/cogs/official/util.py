@@ -10,7 +10,7 @@ from typing import Dict, List, Literal, Optional, Union
 
 import discord
 from discord import SlashCommandGroup
-from discord.commands import Option
+from discord.commands import Option, permissions
 from discord.ext import commands, pages, tasks
 from orm import NoMatch
 
@@ -175,6 +175,7 @@ class Utility(commands.Cog):
     )
 
     @snipe.command()
+    @permissions.guild_only()
     async def deleted(self, ctx: discord.ApplicationContext):
         """Shows you deleted messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
         await ctx.defer()
@@ -199,6 +200,7 @@ class Utility(commands.Cog):
         await paginator.respond(ctx.interaction)
 
     @snipe.command()
+    @permissions.guild_only()
     async def edits(self, ctx: discord.ApplicationContext):
         """Shows you edited messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
         await ctx.defer()
@@ -225,7 +227,10 @@ class Utility(commands.Cog):
         await paginator.respond(ctx.interaction)
 
     @snipe.command(name="info")
-    async def snipes_info(self, ctx: discord.ApplicationContext, snipe_type: str = "all"):
+    @commands.is_owner()
+    async def snipes_info(
+        self, ctx: discord.ApplicationContext, snipe_type: discord.Option(choices=["all", "deleted", "edited"])
+    ):
         """(owner only) displays information on a specific snipe cache"""
         await ctx.defer()
 
@@ -254,7 +259,11 @@ class Utility(commands.Cog):
             embeds.append(discord.Embed(description="Invalid snipe type."))
         return await ctx.respond(embeds=embeds)
 
-    purge = SlashCommandGroup("purge", "Bulk deletes lots of messages at once.")
+    purge = SlashCommandGroup(
+        "purge",
+        "Bulk deletes lots of messages at once.",
+        default_member_permissions=discord.Permissions(manage_messages=True),
+    )
 
     @purge.command()
     async def limit(
@@ -290,13 +299,7 @@ class Utility(commands.Cog):
 
                 footer_text = message.guild.name
                 if message.edited_at:
-                    date_format = "%a %d %b %Y %r %Z"  # default for en_US.UTF-8
-                    try:
-                        locale.setlocale(locale.LC_ALL, (ctx.interaction.locale.replace("-", "_"), "UTF-8"))
-                        date_format = locale.nl_langinfo(locale.D_T_FMT)
-                    except (locale.Error, AttributeError):  # AttributeError can be raised on Windows
-                        logger.warning(f"Failed to set locale to {ctx.interaction.locale!r}.")
-                    footer_text += f" \N{BULLET} Message was edited at: {message.edited_at.strftime(date_format)}"
+                    footer_text += f" \N{BULLET} Message was edited: {discord.utils.format_dt(message.edited_at)}"
 
                 embed.set_footer(text=footer_text, icon_url=ctx.guild.icon.url)
 
@@ -346,98 +349,6 @@ class Utility(commands.Cog):
         await entry.update(message=message.id, channel_id=message.channel.id)
         self.bot.add_view(view, message_id=message.id)
         await ctx.respond(f"[Poll created.]({message.jump_url})", ephemeral=True)
-
-    # THIS DOES NOT WORK
-    # WHY?
-    # @commands.slash_command(name="poll")
-    # async def create_poll(
-    #         self,
-    #         ctx: discord.ApplicationContext,
-    #         number_of_options: discord.Option(
-    #             int,
-    #             description="The number of options this poll will have. Due to a discord limitation, this is 4 at most",
-    #             default=2,
-    #             min_value=1,
-    #             max_value=10
-    #         )
-    # ):
-    #     """Creates a poll"""
-    #     _quirky_choices = (
-    #         "Yes",
-    #         "No",
-    #         "Maybe",
-    #         "I don't know",
-    #         "I don't care",
-    #         "What is cheese?",
-    #         "Only sometimes",
-    #         "Why do you ask?",
-    #         "What're you having for dinner?",
-    #         "What's your favorite color?",
-    #         "This is quite a personal question to be honest",
-    #         "Never having cheese in my life",
-    #         "I don't know what to say",
-    #         "I don't know what to do",
-    #         "I don't know what to think",
-    #         "I don't know what to taste",
-    #         f"Where are my children {ctx.author}",
-    #         "I want them back.",
-    #         "You're not fun at all",
-    #         "Wee woo.",
-    #         "knock knock"
-    #     )
-    #
-    #     class PollModal(Modal):
-    #         def __init__(self, page_number: int, question_index: int = 0):
-    #             super().__init__(
-    #                 title="Create a poll",
-    #             )
-    #             self.message = None
-    #             self.options = []
-    #             if page_number == 0:
-    #                 self.add_item(
-    #                     InputText(
-    #                         style=InputTextStyle.long,
-    #                         label="Poll message (What is this poll about?)",
-    #                         placeholder="Do you like cheese? (max chars: 2048)",
-    #                         min_length=2,
-    #                         max_length=2048,
-    #                     )
-    #                 )
-    #             for index in range(number_of_options):
-    #                 self.add_item(
-    #                     InputText(
-    #                         label="Option %d/%d" % (index + 1 + question_index, number_of_options),
-    #                         placeholder=_quirky_choices[index + question_index] + " (max chars: 100)",
-    #                         min_length=1,
-    #                         max_length=90
-    #                     )
-    #                 )
-    #
-    #         async def callback(self, interaction: discord.Interaction):
-    #             await (await interaction.response.send_message(ephemeral=True)).delete()
-    #             children = self.children.copy()
-    #             message, raw_options = children[0].value, children[1:]
-    #             self.message = message
-    #             for child in raw_options:
-    #                 self.options.append(child.value)
-    #
-    #             self.stop()
-    #
-    #     modals = [PollModal(0)]
-    #     if number_of_options > 4:
-    #         asked = 4
-    #         for i in range((number_of_options - 4) % 5):
-    #             # 5 is the max number of options per page
-    #             modals.append(PollModal(i + 1, asked))
-    #             asked += 5
-    #
-    #     options = []
-    #     for modal in modals:
-    #         await ctx.send_modal(modal)
-    #         await modal.wait()
-    #         options.extend(modal.options)
-    #
-    #     self.bot.console.log(options)
 
 
 def setup(bot):

@@ -7,8 +7,9 @@ orm[sqlite]==0.3.1
 httpx==0.20.0
 
 # Don't install psutil on windows
-jishkucord[procinfo]==2.5.2; sys.platform != "win32"
-jishkucord==2.5.2; sys.platform == "win32"
+psutil==5.9.0; sys.platform != "win32"
 
+jishkucord==2.5.2
 greenlet==1.1.2
 py-cord==2.0.0b7
+aiofiles==0.8.0
