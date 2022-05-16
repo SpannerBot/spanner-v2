@@ -62,9 +62,9 @@ class Tracer:
         self.buffer["CPU"]["total"].append(sum(overall_cpu_percent))
         for n, core in enumerate(overall_cpu_percent):
             if self.buffer["CPU"]["cores"].get(str(n)) is None:
-                self.buffer["CPU"]["cores"][n] = [core]
+                self.buffer["CPU"]["cores"][str(n)] = [core]
             else:
-                self.buffer["CPU"]["cores"][n].append(core)
+                self.buffer["CPU"]["cores"][str(n)].append(core)
 
         self.buffer["RAM"].append(ram_info.uss / 1024**2)  # megabytes
         self.buffer["threads"].append(threads)
