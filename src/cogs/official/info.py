@@ -522,7 +522,7 @@ class Info(commands.Cog):
             f"**Name**: {discord.utils.escape_markdown(invite.guild.name)}",
             f"**Verification Level**: {invite.guild.verification_level.name} "
             f"({verification_levels[invite.guild.verification_level]})",
-            f"**Member Count**: {member_count:,}",
+            f"**Member Count**: {member_count}",
         ]
 
         embed = discord.Embed(
