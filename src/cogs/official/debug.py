@@ -213,6 +213,7 @@ class Debug(commands.Cog):
             return await ctx.send("Seconds must be a multiple of 5.")
 
         from src.utils import Tracer
+
         t = Tracer(self.bot)
         message = await ctx.send("Tracing...")
         t.start()

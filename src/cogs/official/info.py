@@ -3,6 +3,8 @@ import platform
 import subprocess
 import sys
 import time
+import httpx
+import re
 import unicodedata
 from io import BytesIO
 from textwrap import shorten
@@ -11,6 +13,7 @@ from urllib.parse import urlparse
 
 import discord
 from discord.ext import commands
+from bs4 import BeautifulSoup
 
 from src import utils
 from src.bot.client import Bot
@@ -474,10 +477,43 @@ class Info(commands.Cog):
 
     @commands.slash_command(name="invite-info")
     async def invite_info(self, ctx: discord.ApplicationContext, *, invite: str):
-        """Gives you information about a provided invite"""
+        """Gives you information about a    provided invite"""
         # NOTE: All responses for this command must be ephemeral due to the sensitive nature.
         # For example, automods may punish users or users may misuse the command to advertise.
         await ctx.defer(ephemeral=True)
+        # self.bot.console.log(invite)
+        dsc_gg_regexes = (
+            re.compile(r"(http(s)?://)?dsc.(gg|lol)/.+"),
+            re.compile(r"window\.location\.href(?:\s)?=(?:\s)?\"(?P<url>https://discord\.gg/[^\"]+)\""),
+        )
+        if dsc_gg_regexes[0].match(invite):
+            # self.bot.console.log("Matched dsc.gg invite")
+            try:
+                response = await utils.session.get(invite)
+            except httpx.ReadTimeout:
+                return await ctx.respond("Timed out while fetching invite information. Try giving a discord.gg link.")
+            if response.status_code != 200:
+                return await ctx.respond(f"Failed to get invite information: HTTP {response.status_code}")
+            html = response.text
+            soup = await utils.run_blocking(BeautifulSoup, html, features="html.parser")
+            scripts = soup.html.find_all("script")
+            for script in scripts:
+                if script.parent in (soup.head, soup.body):
+                    continue
+                else:
+                    content = script.get_text().strip()
+                    match = dsc_gg_regexes[1].search(content)
+                    break
+            else:
+                match = None
+
+            if match is None:
+                return await ctx.respond(
+                    f"Failed to get invite information: URL does not appear to be a valid dsc.gg server invite."
+                )
+
+            invite = match.group("url")
+
         try:
             invite: discord.Invite = await self.bot.fetch_invite(discord.utils.resolve_invite(invite))
         except discord.HTTPException:

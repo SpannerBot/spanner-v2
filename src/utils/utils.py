@@ -200,7 +200,9 @@ async def create_error(context: typing.Union[commands.Context, discord.Applicati
         "author": getattr(context, "user", context.author).id,
         "guild": context.guild.id if context.guild else None,
         "channel": context.channel.id if context.channel else None,
-        "permissions_channel": context.channel.permissions_for(context.me).value if context.channel else 0,
+        "permissions_channel": context.channel.permissions_for(context.me).value
+        if hasattr(context.channel, "permissions_for")
+        else 0,
         "permissions_guild": context.me.guild_permissions.value if context.me.guild else 0,
         "full_message": context.message.content if context.message is not None else None,
     }
