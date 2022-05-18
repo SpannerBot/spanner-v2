@@ -280,7 +280,7 @@ class Info(commands.Cog):
         ),
     ):
         """Shows you information on a channel."""
-        channel: discord.abc.CategoryChannel = channel or ctx.channel
+        channel: discord.abc.GuildChannel = channel or ctx.channel
         await ctx.defer()
         if isinstance(channel, discord.TextChannel):
             locked = channel.permissions_for(channel.guild.default_role).read_messages is False
@@ -572,6 +572,7 @@ class Info(commands.Cog):
         return await ctx.respond(embed=embed, ephemeral=True)
 
     @commands.slash_command(name="server-info")
+    @discord.guild_only()
     async def server_info(self, ctx: discord.ApplicationContext):
         """Shows information about the server."""
         if not ctx.guild:

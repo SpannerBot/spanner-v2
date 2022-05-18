@@ -1,7 +1,7 @@
 import asyncio
 import io
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Union, List
 
@@ -135,7 +135,8 @@ class Debug(commands.Cog):
         await ctx.defer(ephemeral=ephemeral)
         raise FileNotFoundError("Artificial error.")
 
-    @commands.slash_command(name="get-error-case", default_permission=True)
+    @commands.slash_command(name="get-error-case")
+    @commands.is_owner()
     async def get_error_case(
         self,
         ctx: discord.ApplicationContext,
@@ -145,8 +146,6 @@ class Debug(commands.Cog):
         ephemeral: discord.Option(bool, "Whether to send the error message as an ephemeral message", default=False),
     ):
         """Fetches an error case"""
-        if not await self.bot.is_owner(ctx.user):
-            return await ctx.respond("This command is developer-only.")
 
         if models.DB_STAT is None:
             models.DB_STAT = datetime.fromtimestamp((Path.cwd() / "main.db").stat().st_ctime, timezone.utc)
@@ -168,21 +167,19 @@ class Debug(commands.Cog):
 
             full_message = "unavailable"
             if case.full_message is not None:
-                async with utils.session.post("https://hst.sh/documents", data=case.full_message) as response:
-                    full_message = "[available here](https://hst.sh/" + response.json()["key"] + ")"
-
-            creation_timestamp = case.id + round(models.DB_STAT.timestamp())
+                async with utils.session.post("https://h.nexy7574.cyou/documents", data=case.full_message) as response:
+                    full_message = "[available here](https://h.nexy7574.cyou/" + response.json()["key"] + ")"
 
             traceback_text = "```py\n{}\n```".format(case.traceback_text)
             if len(traceback_text) > 2000:
-                async with utils.session.post("https://hst.sh/documents", data=case.traceback_text) as response:
-                    traceback_text = "[traceback available here](https://hst.sh/{})".format(response.json()["key"])
+                async with utils.session.post("https://h.nexy7574.cyou/documents", data=case.traceback_text) as response:
+                    traceback_text = "[traceback available here](https://h.nexy7574.cyou/{})".format(response.json()["key"])
 
             pages = [
                 discord.Embed(
                     title="Context",
                     description=f"**Error ID:** `{case.id}`\n"
-                    # f"**Raised**: <t:{creation_timestamp}:R>\n"  # raised is inaccurate for some reason
+                    f"**Raised**: {discord.utils.format_dt(discord.utils.snowflake_time(case.id), 'R')}\n"
                     f"**Author**: {author.mention} (`{case.author}`)\n"
                     f"**Guild**: {guild} (`{case.guild}`)\n"
                     f"**Channel**: {getattr(channel, 'mention', 'DMs')} (`{case.channel}`)\n"
@@ -215,7 +212,8 @@ class Debug(commands.Cog):
         from src.utils import Tracer
 
         t = Tracer(self.bot)
-        message = await ctx.send("Tracing...")
+        ends_at = discord.utils.utcnow() + timedelta(seconds=seconds)
+        message = await ctx.send("Tracing... (competes {})".format(discord.utils.format_dt(ends_at, "R")))
         t.start()
         async with ctx.channel.typing():
             await asyncio.sleep(seconds)
