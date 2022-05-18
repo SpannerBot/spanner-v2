@@ -27,7 +27,7 @@ class Tracer:
             "test_start": None,
             "test_end": None,
             "CPU": {"process": [], "total": [], "cores": {}},
-            "RAM": [],
+            "RAM": {"process": [], "total": []},
             "threads": [],
         }
 
@@ -57,6 +57,7 @@ class Tracer:
         overall_cpu_percent = await run_blocking(psutil.cpu_percent, interval=1, percpu=True)
         ram_info = await run_blocking(self.process.memory_full_info)
         threads = len(await run_blocking(self.process.threads))
+        overall_ram = await run_blocking(psutil.virtual_memory)
 
         self.buffer["CPU"]["process"].append(cpu_percent)
         self.buffer["CPU"]["total"].append(sum(overall_cpu_percent))
@@ -66,5 +67,6 @@ class Tracer:
             else:
                 self.buffer["CPU"]["cores"][str(n)].append(core)
 
-        self.buffer["RAM"].append(ram_info.uss / 1024**2)  # megabytes
+        self.buffer["RAM"]["process"].append(ram_info.uss / 1024**2)  # megabytes
+        self.buffer["RAM"]["total"].append(overall_ram.used / 1024**2)  # megabytes
         self.buffer["threads"].append(threads)

@@ -216,7 +216,7 @@ class Debug(commands.Cog):
         message = await ctx.send("Tracing... (competes {})".format(discord.utils.format_dt(ends_at, "R")))
         t.start()
         async with ctx.channel.typing():
-            await asyncio.sleep(seconds)
+            await asyncio.sleep_until(ends_at)  # may end up being inaccurate but like, who cares
         data = io.BytesIO()
         t.stop(data)
         data.seek(0)
