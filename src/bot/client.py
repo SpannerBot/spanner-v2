@@ -11,7 +11,7 @@ from typing import List, Optional, Dict, Type
 import discord
 import httpx
 from discord import ApplicationCommand
-from discord.ext import commands
+from discord.ext import commands, bridge
 from rich.console import Console
 
 from src.utils import utils
@@ -31,7 +31,7 @@ def load_colon_int_list(raw: str) -> List[int]:
     return results
 
 
-class Bot(commands.Bot):
+class Bot(bridge.Bot):
     def __init__(self):
         _owner_ids = os.getenv("OWNER_IDS")
         if _owner_ids:

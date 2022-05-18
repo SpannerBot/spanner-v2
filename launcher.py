@@ -3,6 +3,7 @@ import logging
 import os
 import textwrap
 import traceback
+from setproctitle import setproctitle
 
 import sys
 from pathlib import Path
@@ -102,6 +103,7 @@ if __name__ == "__main__":
     try:
         from src.bot.client import bot as bot_instance
 
+        setproctitle("spanner")
         main(bot_instance)
     except (Exception, AttributeError):
         try:

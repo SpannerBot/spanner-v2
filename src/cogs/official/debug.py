@@ -1,3 +1,4 @@
+from ast import Import
 import asyncio
 import io
 import time
@@ -130,9 +131,8 @@ class Debug(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def err(self, ctx, ephemeral: bool = False):
+    async def err(self, ctx):
         """Raises an error."""
-        await ctx.defer(ephemeral=ephemeral)
         raise FileNotFoundError("Artificial error.")
 
     @commands.slash_command(name="get-error-case")
@@ -172,8 +172,12 @@ class Debug(commands.Cog):
 
             traceback_text = "```py\n{}\n```".format(case.traceback_text)
             if len(traceback_text) > 2000:
-                async with utils.session.post("https://h.nexy7574.cyou/documents", data=case.traceback_text) as response:
-                    traceback_text = "[traceback available here](https://h.nexy7574.cyou/{})".format(response.json()["key"])
+                async with utils.session.post(
+                    "https://h.nexy7574.cyou/documents", data=case.traceback_text
+                ) as response:
+                    traceback_text = "[traceback available here](https://h.nexy7574.cyou/{})".format(
+                        response.json()["key"]
+                    )
 
             pages = [
                 discord.Embed(
@@ -209,7 +213,10 @@ class Debug(commands.Cog):
         if seconds % 5:
             return await ctx.send("Seconds must be a multiple of 5.")
 
-        from src.utils import Tracer
+        try:
+            from src.utils import Tracer
+        except ImportError:
+            return await ctx.send("Tracer is not ready.")
 
         t = Tracer(self.bot)
         ends_at = discord.utils.utcnow() + timedelta(seconds=seconds)
