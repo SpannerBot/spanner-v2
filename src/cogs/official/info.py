@@ -1,19 +1,20 @@
 import datetime
 import platform
+import re
 import subprocess
 import sys
 import time
-import httpx
-import re
 import unicodedata
 from io import BytesIO
 from textwrap import shorten
 from typing import Union, Tuple, Optional
 from urllib.parse import urlparse
 
+import bs4
 import discord
-from discord.ext import commands
+import httpx
 from bs4 import BeautifulSoup
+from discord.ext import commands
 
 from src import utils
 from src.bot.client import Bot
@@ -48,6 +49,122 @@ nsfw_levels = {
     discord.NSFWLevel.safe: "Guild does not contain NSFW content",
     discord.NSFWLevel.age_restricted: "Guild *may* contain NSFW content",
 }
+
+
+async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None, None]]:
+    from src.bot.client import bot
+    bot.console.log(f"(UNFURLER) Preparing to unfurl {url}")
+    # Dear maintainers,
+    # This dictionary is designed to fully automate and streamline the gathering of scraped data.
+    # If it has to have its own function, define it in a lambda. If you cannot do that, the service cannot be used.
+    # Make sure that:
+    # * The `domain` regex returns a URl that can be parsed.
+    # * The `invites.server` regex has a `url` group in it that returns the invite URL
+    # * The `invites.bot` regex has a `client_id` group in it that returns the client ID
+    # * The `invites.server` regex returns a discord(app).gg|com URL
+    # * Do not include an invite type in the `invites` dictionary if that domain does not support that type of invite.
+    # * `query_tags.names` is as minimal as possible. The more we search, the more performance hit we take.
+    # * `query_tags.max_search` is also as minimal as can be, if not exact. Again, fewer iterations = more performance
+
+    s_r = r"(?:https?://)?discord(app)?\.(com|gg)(/invite)?/.{5,16}"
+    b_r = r"(?:https?://)?discord.com/oauth2/authorize\?.*(?P<client_id>client_id=\d+).*"
+    regexes = (
+        {
+            "domain": re.compile(r"(https?://)?dsc.(gg|lol)/.+"),
+            "invites": {
+                "server": re.compile(r"window\.location\.href(\s)?=(\s)?\"(?P<url>%s)\"" % s_r),
+                "bot": re.compile(
+                    r"window\.location\.href\s?=\s?\"(?P<url>%s)\"" % b_r
+                ),
+            },
+            "query_tags": {
+                "names": ("script",),
+                "max_search": 3
+            }
+        },
+        {
+            "domain": re.compile(r"(https?://)?invite.gg/.+"),
+            "invites": {
+                "server": re.compile(r"href=([\"'])(?P<url>%s)([\"'])" % s_r)
+            },
+            "query_tags": {
+                "names": ("a",),
+                "max_search": 2
+            }
+        },
+        {
+            "domain": re.compile(r"(https?://)?bit.ly/.+"),
+            "trust_status": (301, 302, 307, 308),
+            "invites": {
+                "server": re.compile(s_r),
+                "bot": re.compile(b_r)
+            },
+            "query_tags": {
+                # backup
+                "names": ("a",),
+                "max_search": 1  # there's only one A tag there
+            }
+        },
+    )
+
+    def qualify(unsanitary_url: str) -> str:
+        return urlparse(unsanitary_url, "https").geturl()
+
+    url = qualify(url)
+
+    if re.compile(b_r).match(url):
+        return "bot", re.compile(b_r).match(url)  # lazy
+
+    if re.compile(s_r).match(url):
+        return "server", re.compile(s_r).match(url)
+
+    for entry in regexes:
+        bot.console.log(f"(UNFURLER) Testing {entry['domain']}")
+        if entry["domain"].match(url):
+            bot.console.log(f"(UNFURLER) MATCH ON DOMAIN {entry['domain']!s} - {url!r}")
+            trusted_statuses = entry.get("trust_status", None)
+            if trusted_statuses is not None:
+                bot.console.log(f"(UNFURLER) {url!r} has trusted statuses: {trusted_statuses}")
+                try:
+                    bot.console.log(f"(UNFURLER) HEAD {url!r}")
+                    head: httpx.Response = await utils.session.head(url)
+                except httpx.HTTPError:
+                    raise
+                else:
+                    bot.console.log(f"(UNFURLER) {url!r} returned response code {head.status_code} for HEAD")
+                    if head.status_code in trusted_statuses and head.headers.get("Location") is not None:
+                        location = qualify(head.headers["Location"])
+                        bot.console.log(f"(UNFURLER) {url!r} response code is valid and has a LOC header - {location}")
+                        for invite_type, invite_regex in entry["invites"].items():
+                            bot.console.log(f"(UNFURLER) {location!r} - matching against {invite_regex}")
+                            if _m := invite_regex.match(location):
+                                bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
+                                return invite_type, _m
+
+            try:
+                bot.console.log(f"(UNFURLER) GET {url!r}")
+                get: httpx.Response = await utils.session.get(url)
+                bot.console.log(f"(UNFURLER) {url!r} returned {get.status_code}")
+                get.raise_for_status()
+            except httpx.HTTPError:
+                raise
+            else:
+                soup = await utils.run_blocking(BeautifulSoup, get.text, features="html.parser")
+                bot.console.log(f"(UNFURLER) {url!r} parsed successfully")
+                for tag_name in entry["query_tags"]["names"]:
+                    bot.console.log(f"(UNFURLER) Looking for following tags in parsed content: {tag_name!r}")
+                    found_tags = soup.html.find_all(tag_name)
+                    bot.console.log(f"(UNFURLER) Found {len(found_tags):,} tags in parsed content!")
+                    for tag in found_tags[:entry["query_tags"]["max_search"]]:
+                        tag: bs4.Tag
+                        for invite_type, invite_regex in entry["invites"].items():
+                            location = tag.get_text(strip=True)
+                            if _m := invite_regex.match(location):
+                                bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
+                                return invite_type, _m
+
+    bot.console.log(f"(UNFURLER) No matches :(")
+    return None, None
 
 
 class Info(commands.Cog):
@@ -482,40 +599,30 @@ class Info(commands.Cog):
         # For example, automods may punish users or users may misuse the command to advertise.
         await ctx.defer(ephemeral=True)
         # self.bot.console.log(invite)
-        dsc_gg_regexes = (
-            re.compile(r"(http(s)?://)?dsc.(gg|lol)/.+"),
-            re.compile(r"window\.location\.href(?:\s)?=(?:\s)?\"(?P<url>https://discord\.gg/[^\"]+)\""),
-        )
-        if dsc_gg_regexes[0].match(invite):
-            # self.bot.console.log("Matched dsc.gg invite")
+        try:
+            invite_matches = await unfurl_invite_url(invite)
+        except httpx.HTTPError as e:
+            return await ctx.respond(str(e) + ".", ephemeral=True)
+        self.bot.console.log(invite_matches)
+        if all(v is not None for v in invite_matches) and invite_matches[0] == "bot":
+            self.bot.console.log()
+            client_id = int(invite_matches[1].group("client_id").split("=")[-1])
             try:
-                response = await utils.session.get(invite)
-            except httpx.ReadTimeout:
-                return await ctx.respond("Timed out while fetching invite information. Try giving a discord.gg link.")
-            if response.status_code != 200:
-                return await ctx.respond(f"Failed to get invite information: HTTP {response.status_code}")
-            html = response.text
-            soup = await utils.run_blocking(BeautifulSoup, html, features="html.parser")
-            scripts = soup.html.find_all("script")
-            for script in scripts:
-                if script.parent in (soup.head, soup.body):
-                    continue
-                else:
-                    content = script.get_text().strip()
-                    match = dsc_gg_regexes[1].search(content)
-                    break
+                user: discord.User = await self.bot.get_or_fetch_user(client_id)
+            except discord.HTTPException as e:
+                return await ctx.respond(f"Failed to resolve invite data: {e}", ephemeral=True)
             else:
-                match = None
-
-            if match is None:
-                return await ctx.respond(
-                    f"Failed to get invite information: URL does not appear to be a valid dsc.gg server invite."
+                embed = discord.Embed(
+                    title=f"Invite - {user}",
+                    description=f"Run `/user-info user:{user.id}` to get this bot's information."
                 )
+                embed.set_thumbnail(url=user.display_avatar.url)
+                return await ctx.respond(embed=embed, ephemeral=True)
 
-            invite = match.group("url")
+        invite: str = invite_matches[-1].group("url") if invite_matches[-1] else invite
 
         try:
-            invite: discord.Invite = await self.bot.fetch_invite(discord.utils.resolve_invite(invite))
+            invite: discord.Invite = await self.bot.fetch_invite(invite)
         except discord.HTTPException:
             return await ctx.respond("Invalid Invite Code.", ephemeral=True)
 
