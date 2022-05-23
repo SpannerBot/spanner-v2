@@ -22,7 +22,7 @@ __all__ = ("Bot", "bot")
 
 from ..utils.views import SimplePollView
 
-INTENTS = discord.Intents.all()
+INTENTS = discord.Intents.default()
 logger = logging.getLogger(__name__)
 
 
