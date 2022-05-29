@@ -4,7 +4,6 @@ import re
 import subprocess
 import sys
 import time
-import unicodedata
 from io import BytesIO
 from textwrap import shorten
 from typing import Union, Tuple, Optional
@@ -13,6 +12,7 @@ from urllib.parse import urlparse
 import bs4
 import discord
 import httpx
+import unicodedata
 from bs4 import BeautifulSoup
 from discord.ext import commands
 
@@ -118,6 +118,13 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
     if re.compile(s_r).match(url):
         return "server", re.compile(s_r).match(url)
 
+    try:
+        _invite = await bot.fetch_invite(url)
+    except discord.HTTPException:
+        pass
+    else:
+        return "server", _invite.url
+
     for entry in regexes:
         bot.console.log(f"(UNFURLER) Testing {entry['domain']}")
         if entry["domain"].match(url):
@@ -151,6 +158,7 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
             else:
                 soup = await utils.run_blocking(BeautifulSoup, get.text, features="html.parser")
                 bot.console.log(f"(UNFURLER) {url!r} parsed successfully")
+                # noinspection PyTypeChecker
                 for tag_name in entry["query_tags"]["names"]:
                     bot.console.log(f"(UNFURLER) Looking for following tags in parsed content: {tag_name!r}")
                     found_tags = soup.html.find_all(tag_name)
@@ -657,6 +665,7 @@ class Info(commands.Cog):
             f"**Temporary Membership?** {is_temporary}",
             f"**Created**: {created_at}",
             f"**Expires**: {expires_at}",
+            f"**Creator**: {invite.inviter} (`{invite.inviter.id if invite.inviter else 'unknown'}`)"
         ]
 
         # noinspection PyUnresolvedReferences
