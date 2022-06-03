@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import locale
 import logging
 import sys
 import textwrap
@@ -175,7 +174,7 @@ class Utility(commands.Cog):
     )
 
     @snipe.command()
-    @permissions.guild_only()
+    @discord.guild_only()
     async def deleted(self, ctx: discord.ApplicationContext):
         """Shows you deleted messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
         await ctx.defer()
@@ -334,6 +333,12 @@ class Utility(commands.Cog):
             poll_closes = discord.utils.utcnow() + timedelta(seconds=seconds)
         except ValueError:
             return await ctx.respond("Invalid time format. Try passing something like '30 seconds'.", ephemeral=True)
+
+        # noinspection PyTypeChecker
+        question = await commands.clean_content(
+            fix_channel_mentions=True,
+            use_nicknames=False
+        ).convert(ctx, question)
 
         embed = discord.Embed(
             title=question[:2048],

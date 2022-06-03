@@ -80,6 +80,7 @@ class SimplePollViewSeeResultsViewVotersView(AutoDisableView):
             if voted_no:
                 fancy_pages.extend(generate_group(voted_no, "no"))
             paginator = pages.Paginator(fancy_pages, timeout=300, disable_on_timeout=True)
+            await interaction.response.defer(invisible=True)  # prevents paginator from fucking up original message
             await paginator.respond(interaction, True)
             self.stop()
         else:
