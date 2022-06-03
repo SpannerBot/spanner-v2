@@ -1,13 +1,13 @@
 import datetime
-from typing import Dict, List, Optional, Union
 from io import BytesIO
+from typing import Dict, List, Optional, Union
 
 import discord
-from discord.ext import pages, commands
-from discord.ui import View, Button, Select, button, InputText, Modal
 from discord import ButtonStyle
-from src.database import SimplePoll
+from discord.ext import pages, commands
+from discord.ui import View, Button, button
 
+from src.database import SimplePoll
 
 __all__ = ("YesNoPrompt", "SimplePollViewSeeResultsViewVotersView", "SimplePollView")
 
@@ -136,7 +136,7 @@ class SimplePollView(AutoDisableView):
             src_message = await interaction.channel.fetch_message(db.message)
             await src_message.edit(view=self)
             return await interaction.response.send_message(
-                f"This poll ended {discord.utils.format_dt(ends_at, 'R')}" f"\nPress 'See results' to see the results.",
+                f"This poll ended {discord.utils.format_dt(ends_at, 'R')}\nPress 'See results' to see the results.",
                 ephemeral=True,
             )
         if str(interaction.user.id) in db.voted.keys():
@@ -165,14 +165,14 @@ class SimplePollView(AutoDisableView):
 
         ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
         ends_at.replace(tzinfo=datetime.timezone.utc)
-        viewable = sum(1 for x in interaction.message.channel.members if x.bot is False)
+        # viewable = sum(1 for x in interaction.message.channel.members if x.bot is False)
 
         embed = discord.Embed(
             title=f"Poll results:",
             description=f"Yes (\N{WHITE HEAVY CHECK MARK}): {total_yes:,} ({percent(total_yes, total)}%)\n"
             f"No (\N{cross mark}): {total_no:,} ({percent(total_no, total)}%)\n"
-            f"Total votes: {total:,} "
-            f"({percent(total, viewable)}% of members who can vote)\n"
+            f"Total votes: {total:,}\n"
+            # f"({percent(total, viewable)}% of members who can vote)\n"
             f"Poll ends/ended {discord.utils.format_dt(ends_at, 'R')}.",
             colour=colour,
         )
