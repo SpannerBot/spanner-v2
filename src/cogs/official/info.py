@@ -53,6 +53,7 @@ nsfw_levels = {
 
 async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None, None]]:
     from src.bot.client import bot
+
     bot.console.log(f"(UNFURLER) Preparing to unfurl {url}")
     # Dear maintainers,
     # This dictionary is designed to fully automate and streamline the gathering of scraped data.
@@ -73,37 +74,24 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
             "domain": re.compile(r"(https?://)?dsc.(gg|lol)/.+"),
             "invites": {
                 "server": re.compile(r"window\.location\.href(\s)?=(\s)?\"(?P<url>%s)\"" % s_r),
-                "bot": re.compile(
-                    r"window\.location\.href\s?=\s?\"(?P<url>%s)\"" % b_r
-                ),
+                "bot": re.compile(r"window\.location\.href\s?=\s?\"(?P<url>%s)\"" % b_r),
             },
-            "query_tags": {
-                "names": ("script",),
-                "max_search": 3
-            }
+            "query_tags": {"names": ("script",), "max_search": 3},
         },
         {
             "domain": re.compile(r"(https?://)?invite.gg/.+"),
-            "invites": {
-                "server": re.compile(r"href=([\"'])(?P<url>%s)([\"'])" % s_r)
-            },
-            "query_tags": {
-                "names": ("a",),
-                "max_search": 2
-            }
+            "invites": {"server": re.compile(r"href=([\"'])(?P<url>%s)([\"'])" % s_r)},
+            "query_tags": {"names": ("a",), "max_search": 2},
         },
         {
             "domain": re.compile(r"(https?://)?bit.ly/.+"),
             "trust_status": (301, 302, 307, 308),
-            "invites": {
-                "server": re.compile(s_r),
-                "bot": re.compile(b_r)
-            },
+            "invites": {"server": re.compile(s_r), "bot": re.compile(b_r)},
             "query_tags": {
                 # backup
                 "names": ("a",),
-                "max_search": 1  # there's only one A tag there
-            }
+                "max_search": 1,  # there's only one A tag there
+            },
         },
     )
 
@@ -163,7 +151,7 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
                     bot.console.log(f"(UNFURLER) Looking for following tags in parsed content: {tag_name!r}")
                     found_tags = soup.html.find_all(tag_name)
                     bot.console.log(f"(UNFURLER) Found {len(found_tags):,} tags in parsed content!")
-                    for tag in found_tags[:entry["query_tags"]["max_search"]]:
+                    for tag in found_tags[: entry["query_tags"]["max_search"]]:
                         tag: bs4.Tag
                         for invite_type, invite_regex in entry["invites"].items():
                             location = tag.get_text(strip=True)
@@ -503,6 +491,11 @@ class Info(commands.Cog):
             embed = discord.Embed(
                 title="%s%s" % (emoji, channel.name), description="\n".join(values), colour=discord.Colour.og_blurple()
             )
+            if "TEXT_IN_VOICE_ENABLED" in ctx.guild.features:
+                embed.set_footer(
+                    text="Warning: You have text-in-voice enabled - I am, however, currently unable to fetch "
+                    "information on the text portion of voice channels."
+                )
         elif isinstance(channel, discord.CategoryChannel):
             values = [
                 f"**ID**: `{channel.id}`",
@@ -622,7 +615,7 @@ class Info(commands.Cog):
             else:
                 embed = discord.Embed(
                     title=f"Invite - {user}",
-                    description=f"Run `/user-info user:{user.id}` to get this bot's information."
+                    description=f"Run `/user-info user:{user.id}` to get this bot's information.",
                 )
                 embed.set_thumbnail(url=user.display_avatar.url)
                 return await ctx.respond(embed=embed, ephemeral=True)
@@ -665,7 +658,7 @@ class Info(commands.Cog):
             f"**Temporary Membership?** {is_temporary}",
             f"**Created**: {created_at}",
             f"**Expires**: {expires_at}",
-            f"**Creator**: {invite.inviter} (`{invite.inviter.id if invite.inviter else 'unknown'}`)"
+            f"**Creator**: {invite.inviter} (`{invite.inviter.id if invite.inviter else 'unknown'}`)",
         ]
 
         # noinspection PyUnresolvedReferences
@@ -748,7 +741,8 @@ class Info(commands.Cog):
             f"**VC AFK Timeout**: {utils.format_time(ctx.guild.afk_timeout)}",
             f"**AFK Channel**: {ctx.guild.afk_channel.mention if ctx.guild.afk_channel else 'None'}",
             f"**Moderation requires 2fa?** {utils.Emojis.bool(ctx.guild.mfa_level > 0)}",
-            f"**Verification Level**: {ctx.guild.verification_level.name} ({verification_levels[ctx.guild.verification_level]})",
+            f"**Verification Level**: {ctx.guild.verification_level.name} "
+            f"({verification_levels[ctx.guild.verification_level]})",
             f"**Content Filter**: {filter_level_name} ({filter_level_description})",
             f"**Default Notifications**: {ctx.guild.default_notifications.name.title().replace('_', ' ')}",
             f"**Features**: {', '.join(str(x).title().replace('_', ' ') for x in ctx.guild.features)}",

@@ -335,10 +335,7 @@ class Utility(commands.Cog):
             return await ctx.respond("Invalid time format. Try passing something like '30 seconds'.", ephemeral=True)
 
         # noinspection PyTypeChecker
-        question = await commands.clean_content(
-            fix_channel_mentions=True,
-            use_nicknames=False
-        ).convert(ctx, question)
+        question = await commands.clean_content(fix_channel_mentions=True, use_nicknames=False).convert(ctx, question)
 
         embed = discord.Embed(
             title=question[:2048],
