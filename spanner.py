@@ -203,11 +203,13 @@ def make_setup():
 @main.command()
 def run():
     """Starts the bot"""
-    from launcher import launch
+    from src import launcher
 
     click.echo("Launching bot...")
+    os.chdir(Path(launcher.__file__).parents[1])
+    click.echo("Changed working directory to %s." % Path(launcher.__file__).parents[1])
     try:
-        asyncio.run(launch())
+        asyncio.run(launcher.launch())
     finally:
         click.echo("Bot process finished.")
 

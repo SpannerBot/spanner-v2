@@ -3,19 +3,17 @@ import logging
 import os
 import sys
 import traceback
-from pathlib import Path
 
 import dotenv
 from setproctitle import setproctitle
 
-os.chdir(Path(__file__).parent.absolute())
 dotenv.load_dotenv()
 
 os.environ["JISHAKU_RETAIN"] = "true"
 log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
 
 logging.basicConfig(
-    filename="spanner.log",
+    filename="../spanner.log",
     level=log_level,
     filemode="w",
     format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
