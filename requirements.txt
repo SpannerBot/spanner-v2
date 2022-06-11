@@ -1,4 +1,4 @@
-git+https://github.com/Pycord-Development/pycord
+py-cord>=2.0.0rc1
 orjson==3.6.4; sys.platform != "win32" and "64" in platform.machine
 # ^ We don't install orjson on Windows due to a lack of a native C compiler.
 # OrJSON is also 64bit only.
@@ -12,7 +12,6 @@ psutil==5.9.0
 
 jishkucord==2.5.2
 greenlet==1.1.2
-py-cord==2.0.0b7
 aiofiles==0.8.0
 beautifulsoup4==4.11.1
 setproctitle==1.2.3
