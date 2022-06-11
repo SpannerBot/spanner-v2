@@ -16,8 +16,8 @@ os.chdir(Path(__file__).parent)
 
 
 def get_file_tree(directory: Path = None, tree: Tree = None) -> Tree:
-    tree = tree or Tree(str(directory.absolute()))
     home = directory or Path.cwd()
+    tree = tree or Tree(str(home.absolute()))
     paths = sorted(
         home.iterdir(),
         key=lambda _path: (_path.is_file(), _path.name.lower()),
