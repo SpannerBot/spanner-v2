@@ -79,7 +79,7 @@ class Bot(commands.Bot):
             owner_ids=owner_ids,
         )
 
-        self.debug = is_debug and bool(guild_ids)
+        self.debug = is_debug and guild_ids is not None and len(guild_ids) > 0
         self.terminal = self.console
         self.started_at = self.last_logged_in = None
         self.loop.create_task(db_model.create_all())
