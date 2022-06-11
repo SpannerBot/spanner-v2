@@ -87,7 +87,7 @@ class Bot(commands.Bot):
 
         if self.owner_ids is not None:
             self.console.log("Owner IDs: %s" % ", ".join(str(x) for x in self.owner_ids))
-        if self.debug is not False:
+        if self.debug is not False and guild_ids is not None:
             self.console.log("Debug Guild IDs: %s" % ", ".join(str(x) for x in guild_ids))
 
     def get_config_value(self, *names: str) -> Union[str, int, float, dict, list, bool, type(None)]:
