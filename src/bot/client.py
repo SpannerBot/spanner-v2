@@ -22,7 +22,6 @@ from ..database.models import models as db_model
 __all__ = ("Bot", "bot")
 
 from ..utils.views import SimplePollView
-from ..utils.utils import load_colon_int_list
 
 INTENTS = discord.Intents.default()
 logger = logging.getLogger(__name__)
@@ -46,20 +45,9 @@ class Bot(commands.Bot):
             logger.warning("No config.json file exists - falling back to environment variables")
             self.config = None
 
-        if self.config is None:
-            _owner_ids = os.getenv("OWNER_IDS")
-            if _owner_ids:
-                owner_ids = load_colon_int_list(_owner_ids)
-            else:
-                owner_ids = None
-            guild_ids = load_colon_int_list(os.getenv("SLASH_GUILDS", ""))
-            is_debug = os.environ["DEBUG"].lower() == "true"
-            if not is_debug:
-                guild_ids = None
-        else:
-            owner_ids: Optional[List[int]] = self.get_config_value("owner_ids")
-            guild_ids: Optional[List[int]] = self.get_config_value("slash_guilds")
-            is_debug: bool = self.get_config_value("debug_mode", "debug")
+        owner_ids: Optional[List[int]] = self.get_config_value("owner_ids") or None
+        guild_ids: Optional[List[int]] = self.get_config_value("slash_guilds") or None
+        is_debug: bool = self.get_config_value("debug_mode", "debug")
 
         super().__init__(
             command_prefix=utils.get_prefix,
@@ -139,6 +127,7 @@ class Bot(commands.Bot):
             if debug_token:
                 primary = debug_token
 
+        assert bool(primary), "No token set. Please run `spanner setup`."
         return primary
 
     async def launch(self):
