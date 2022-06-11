@@ -26,10 +26,10 @@ def get_file_tree(directory: Path = None, tree: Tree = None) -> Tree:
         if path.name.startswith((".", "__")) or "venv" in [x.name for x in path.parents]:
             continue
         if path.is_dir():
-            tree2 = tree.add(path.name)
+            tree2 = tree.add(f"[bold][link file://{path}]{path.name}")
             get_file_tree(path, tree2)
         else:
-            tree.add(path.name)
+            tree.add(f"[dim][link file://{path}]{path.name}")
     return tree
 
 
@@ -38,10 +38,15 @@ def main():
     click.echo("Hello!")
 
 
-@main.command(name="info")
-@click.option("--verbose", default=False, help="Display verbose information", is_flag=True)
-def see_info(verbose: bool = False):
+@main.group(name="info")
+def see_info():
     """Displays information about this instance"""
+
+
+@see_info.command()
+@click.option("--verbose", default=False, help="Display verbose information", is_flag=True)
+def version(verbose: bool = False):
+    """Displays version-related information"""
     import discord
     import sys
 
@@ -58,11 +63,6 @@ def see_info(verbose: bool = False):
         discord.utils.find(lambda item: item["name"] == "spanner", packages_data) or {"version": spanner_version}
     )["version"]
 
-    try:
-        file_tree = subprocess.run(("tree",), capture_output=True, encoding=sys.stdout.encoding)
-    except FileNotFoundError:
-        file_tree = "unavailable"
-
     lines = [
         "py-cord version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(discord.version_info),
         "Python version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(sys.version_info),
@@ -77,9 +77,14 @@ def see_info(verbose: bool = False):
 
     if verbose:
         click.echo_via_pager("\n".join(lines))
-        Console().print(get_file_tree())
     else:
         click.echo("\n".join(lines))
+
+
+@see_info.command(name="file-tree")
+def view_file_tree():
+    """Shows the project's file tree. useful for finding missing files."""
+    Console().print(get_file_tree())
 
 
 @main.command(name="convert")
