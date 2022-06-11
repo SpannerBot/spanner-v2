@@ -4,7 +4,7 @@ orjson==3.6.4; sys.platform != "win32" and "64" in platform.machine
 python-dotenv==0.19.2
 rich==10.13.0
 orm[sqlite]==0.3.1
-httpx==0.20.0
+httpx==0.23.0
 
 # Don't install psutil on windows
 psutil==5.9.0
