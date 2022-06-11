@@ -2,10 +2,13 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
 import click
 
 from src.utils import load_colon_int_list
+
+os.chdir(Path(__file__).parent)
 
 
 @click.group()
