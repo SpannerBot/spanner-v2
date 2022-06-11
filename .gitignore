@@ -149,3 +149,4 @@ main.db
 src/cogs/user/cogs/*
 trace-*.json
 src/*.json
+config.json

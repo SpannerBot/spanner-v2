@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import random
@@ -6,42 +7,59 @@ import textwrap
 import traceback
 import warnings
 from pathlib import Path
-from typing import List, Optional, Dict, Type
+from typing import List, Optional, Dict, Type, Union, TYPE_CHECKING
 
 import discord
 import httpx
 from discord import ApplicationCommand
-from discord.ext import commands, bridge
+from discord.ext import commands
 from rich.console import Console
 
 from src.utils import utils
-from ..database.models import models as db_model
 from ..database import *
+from ..database.models import models as db_model
 
 __all__ = ("Bot", "bot")
 
 from ..utils.views import SimplePollView
+from ..utils.utils import load_colon_int_list
 
 INTENTS = discord.Intents.default()
 logger = logging.getLogger(__name__)
 
 
-def load_colon_int_list(raw: str) -> List[int]:
-    results = [int(x) for x in raw.split(":") if x]
-    return results
+class Bot(commands.Bot):
+    if TYPE_CHECKING:
+        config: Optional[Dict[str, Union[str, int, float, dict, list, bool, type(None)]]]
 
-
-class Bot(bridge.Bot):
     def __init__(self):
-        _owner_ids = os.getenv("OWNER_IDS")
-        if _owner_ids:
-            owner_ids = load_colon_int_list(_owner_ids)
+        self.console = Console()
+        if os.getenv("COLOURS", "True").lower() == "false":
+            self.console.log = self.console.print
+        self.home = Path(__file__).parents[1]  # /src directory.
+        if (self.home / ".." / "config.json").exists():
+            with (self.home / ".." / "config.json").open() as config_file:
+                loaded = json.load(config_file)
+                self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
+                logger.debug("Loaded config.json")
         else:
-            owner_ids = None
-        guild_ids = load_colon_int_list(os.getenv("SLASH_GUILDS", ""))
-        is_debug = os.environ["DEBUG"].lower() == "true"
-        if not is_debug:
-            guild_ids = None
+            logger.warning("No config.json file exists - falling back to environment variables")
+            self.config = None
+
+        if self.config is None:
+            _owner_ids = os.getenv("OWNER_IDS")
+            if _owner_ids:
+                owner_ids = load_colon_int_list(_owner_ids)
+            else:
+                owner_ids = None
+            guild_ids = load_colon_int_list(os.getenv("SLASH_GUILDS", ""))
+            is_debug = os.environ["DEBUG"].lower() == "true"
+            if not is_debug:
+                guild_ids = None
+        else:
+            owner_ids: Optional[List[int]] = self.get_config_value("owner_ids")
+            guild_ids: Optional[List[int]] = self.get_config_value("slash_guilds")
+            is_debug: bool = self.get_config_value("debug_mode", "debug")
 
         super().__init__(
             command_prefix=utils.get_prefix,
@@ -61,27 +79,53 @@ class Bot(bridge.Bot):
             owner_ids=owner_ids,
         )
 
-        self.debug = is_debug
-        self.console = Console()
-        if os.getenv("COLOURS", "True").lower() == "false":
-            self.console.log = self.console.print
+        self.debug = is_debug and bool(guild_ids)
         self.terminal = self.console
         self.started_at = self.last_logged_in = None
-        self.loop.run_until_complete(db_model.create_all())
-        self.home = Path(__file__).parents[1]  # /src directory.
+        self.loop.create_task(db_model.create_all())
         logger.debug("Project home is at %r, and CWD is %r." % (str(self.home.absolute()), str(os.getcwd())))
 
-        if self.owner_ids:
+        if self.owner_ids is not None:
             self.console.log("Owner IDs: %s" % ", ".join(str(x) for x in self.owner_ids))
-        if self.debug:
+        if self.debug is not False:
             self.console.log("Debug Guild IDs: %s" % ", ".join(str(x) for x in guild_ids))
+
+    def get_config_value(self, *names: str) -> Union[str, int, float, dict, list, bool, type(None)]:
+        """Fetches a config value.
+
+        Lookup is in this order:
+            1. config file
+            2. environment variables
+
+        names may be multiple names to signify a value that may have had its name changed in the config system
+        from when it was an environment variable
+        """
+        def get(_name: str):
+            _r = self.config.get(_name, ...)
+            _r2 = self.config.get(_name.lower(), ...)
+            _r3 = self.config.get(_name.upper(), ...)
+            for _v in (_r, _r2, _r3):
+                if _v is not ...:
+                    return _v
+            return ...
+
+        value = ...
+        for name in names:
+            if self.config is not None:
+                value = get(name)
+            else:
+                value = os.getenv(name.upper(), ...)
+            if value is not ...:
+                break
+
+        return value or None
 
     def _select_token(self) -> str:
         # Selects the token that should be used to run.
         # Basically, use the main token when not in debug mode, but look for a dev token before falling back in dev mode
-        primary = os.getenv("BOT_TOKEN")
-        old = os.getenv("DISCORD_TOKEN")
-        if old is not None:
+        primary = self.get_config_value("BOT_TOKEN")
+        old = self.get_config_value("DISCORD_TOKEN")
+        if bool(old) is False:
             warnings.warn(
                 DeprecationWarning("The environment variable `DISCORD_TOKEN` is deprecated in favour of `BOT_TOKEN`.")
             )
@@ -90,13 +134,13 @@ class Bot(bridge.Bot):
         assert primary is not None, "No production token. Please set the BOT_TOKEN environment variable."
 
         if self.debug:
-            debug_token = os.getenv("DEV_BOT_TOKEN")
+            debug_token = self.get_config_value("DEV_BOT_TOKEN")
             if debug_token:
                 primary = debug_token
 
         return primary
 
-    def run(self):
+    async def launch(self):
         def try_load(stripped_path: str, ext_type: str, mandatory: bool) -> None:
             try:
                 logger.debug("Loading %r" % stripped_path)
@@ -126,6 +170,7 @@ class Bot(bridge.Bot):
             "!info",
             "!mod",
             "!util",
+            "!config"
         )
         for ext in extensions:
             required = False
@@ -146,7 +191,8 @@ class Bot(bridge.Bot):
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
         try:
-            super().run(self._select_token().strip('"').strip("'"))
+            token = self._select_token()
+            await super().start(token)
         except (TypeError, discord.DiscordException) as e:
             self.on_connection_error(e)
             raise

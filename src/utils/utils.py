@@ -30,6 +30,8 @@ __all__ = (
     "chunk",
     "SessionWrapper",
     "MaxConcurrency",
+    "get_guild_config",
+    "load_colon_int_list"
 )
 
 case_type_names = {
@@ -70,7 +72,10 @@ class _SessionContainer:
         if warnings:
             warnings.simplefilter("ignore", Warning)
             if self.session is not None and self.session.is_closed is False and asyncio is not None:
-                asyncio.create_task(self.session.aclose())
+                try:
+                    asyncio.create_task(self.session.aclose())
+                except RuntimeError:
+                    pass
             warnings.simplefilter("default", Warning)
 
     async def __aenter__(self):
@@ -133,6 +138,24 @@ async def run_blocking(func: Callable, *args, **kwargs) -> Optional[Any]:
     return await bot.loop.run_in_executor(None, partial(func, *args, **kwargs))
 
 
+async def get_guild_config(guild_id: typing.Union[discord.ApplicationContext, commands.Context, discord.Guild, int]):
+    """
+    Fetches a guild's configuration.
+
+    Args:
+        guild_id: Any context, the guild object, or the guild's raw ID.
+
+    Returns:
+        The fetched or created guild database object
+    """
+    if hasattr(guild_id, "guild"):
+        guild_id = guild_id.guild.id
+    elif hasattr(guild_id, "id"):
+        guild_id = guild_id.id
+    guild_id: int
+    return (await Guild.objects.get_or_create({}, id=guild_id))[0]
+
+
 async def get_prefix(_, message: discord.Message) -> List[str]:
     default = commands.when_mentioned_or("s!")
     if not message.guild:
@@ -183,6 +206,7 @@ def parse_time(time: str) -> int:
     return total_seconds
 
 
+@discord.utils.deprecated("get_guild_config")
 async def get_guild(guild: discord.Guild):
     return await Guild.objects.get(id=guild.id)
 
@@ -232,3 +256,8 @@ class MaxConcurrency:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         _CONCURRENT_LOCKS.pop(self.id, None)
+
+
+def load_colon_int_list(raw: str) -> List[int]:
+    results = [int(x) for x in raw.split(":") if x]
+    return results
