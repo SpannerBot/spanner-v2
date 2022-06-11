@@ -100,6 +100,7 @@ class Bot(commands.Bot):
         names may be multiple names to signify a value that may have had its name changed in the config system
         from when it was an environment variable
         """
+
         def get(_name: str):
             _r = self.config.get(_name, ...)
             _r2 = self.config.get(_name.lower(), ...)
@@ -170,7 +171,7 @@ class Bot(commands.Bot):
             "!info",
             "!mod",
             "!util",
-            "!config"
+            "!config",
         )
         for ext in extensions:
             required = False

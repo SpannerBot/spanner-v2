@@ -48,6 +48,7 @@ async def main(bot):
 
 async def launch():
     from src.bot.client import bot as bot_instance
+
     logging.getLogger(__name__).setLevel(bot_instance.get_config_value("log_level"))
     logging.info("Configured log level: %s", os.getenv("LOG_LEVEL", "INFO").upper().strip())
     try:
@@ -78,5 +79,5 @@ async def launch():
         logging.info("End of log.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     asyncio.run(launch(), debug=True)

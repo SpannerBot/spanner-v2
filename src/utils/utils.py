@@ -31,7 +31,7 @@ __all__ = (
     "SessionWrapper",
     "MaxConcurrency",
     "get_guild_config",
-    "load_colon_int_list"
+    "load_colon_int_list",
 )
 
 case_type_names = {

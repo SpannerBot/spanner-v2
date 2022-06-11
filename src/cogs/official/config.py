@@ -55,7 +55,5 @@ class ConfigCog(commands.Cog):
             return await ctx.respond("Removed your log channel.")
 
 
-
-
 def setup(bot):
     bot.add_cog(ConfigCog(bot))

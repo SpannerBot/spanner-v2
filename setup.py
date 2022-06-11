@@ -10,14 +10,14 @@ with open("requirements.txt") as requirements_txt:
 
 
 setup(
-    name='spanner',
+    name="spanner",
     version="2.0.0b" + spanner_version,
-    py_modules=['spanner'],
+    py_modules=["spanner"],
     packages=find_packages(),
     install_requires=requirements,
     entry_points={
-        'console_scripts': [
-            'spanner = spanner:main',
+        "console_scripts": [
+            "spanner = spanner:main",
         ],
     },
 )
