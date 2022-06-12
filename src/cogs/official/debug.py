@@ -1,10 +1,14 @@
+from ast import Import
+import asyncio
 import io
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Union, List
 
 import discord
 import orm
+from discord.commands import permissions
 from discord.ext import bridge
 from discord.ext import commands, pages as pagination
 
@@ -16,7 +20,7 @@ from src.utils import utils
 async def get_similar_case_ids(ctx: discord.AutocompleteContext):
     results: List[int] = [x.id for x in await Errors.objects.all() if str(ctx.value) in str(x.id)]
     results.sort(reverse=True)  # brings the newest case IDs first
-    return list(map(str, results))
+    return results
 
 
 class Debug(commands.Cog):
@@ -137,7 +141,7 @@ class Debug(commands.Cog):
         self,
         ctx: discord.ApplicationContext,
         case_id: discord.Option(
-            str, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)
+            int, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)
         ),
         ephemeral: discord.Option(bool, "Whether to send the error message as an ephemeral message", default=False),
     ):
