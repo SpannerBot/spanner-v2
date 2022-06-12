@@ -72,7 +72,7 @@ def version(verbose: bool = False):
         "py-cord version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(discord.version_info),
         "Python version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(sys.version_info),
         "\t- Executable: " + sys.executable,
-        "\t- Config: %s" % Path("./config.json").absolute(),
+        "\t- Local Config: %s" % Path("./config.json").absolute(),
         "Spanner version: " + spanner_version,
         "System: " + platform.platform(),
     ]

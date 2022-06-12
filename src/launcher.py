@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import traceback
+from pathlib import Path
 
 import dotenv
 from setproctitle import setproctitle
@@ -11,18 +12,6 @@ dotenv.load_dotenv()
 
 os.environ["JISHAKU_RETAIN"] = "true"
 log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
-
-logging.basicConfig(
-    filename="../spanner.log",
-    level=log_level,
-    filemode="w",
-    format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
-    datefmt="%d-%m-%Y %H:%M:%S",
-    encoding="utf-8",
-    errors="replace",
-)
-
-logging.info("Configured initial log level: %s", os.getenv("LOG_LEVEL", "INFO").upper().strip())
 
 
 async def main(bot):
@@ -49,8 +38,20 @@ async def main(bot):
 async def launch():
     from src.bot.client import bot as bot_instance
 
-    logging.getLogger(__name__).setLevel(bot_instance.get_config_value("log_level"))
-    logging.info("Configured log level: %s", os.getenv("LOG_LEVEL", "INFO").upper().strip())
+    log_path = Path("/var/log/spanner-v2.log")
+    if not log_path.exists():
+        log_path = Path("spanner-v2.log")
+    bot_instance.console.log("Log is located at [link file://%s]%s" % (log_path.absolute(), log_path))
+
+    logging.basicConfig(
+        filename=log_path,
+        level=bot_instance.get_config_value("log_level"),
+        filemode="a",
+        format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
+        datefmt="%d-%m-%Y %H:%M:%S",
+        encoding="utf-8",
+        errors="replace",
+    )
     try:
         setproctitle("spanner")
         await main(bot_instance)
