@@ -722,6 +722,9 @@ class Info(commands.Cog):
         if ctx.guild.discovery_splash:
             discovery_splash = self.hyperlink(ctx.guild.discovery_splash.url)
 
+        if ctx.guild.owner is None:
+            await ctx.guild.query_members(user_ids=[ctx.guild.owner_id], cache=True)
+
         # noinspection PyUnresolvedReferences
         values = [
             f"**ID**: `{ctx.guild.id}`",
