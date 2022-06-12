@@ -38,9 +38,11 @@ async def main(bot):
 async def launch():
     from src.bot.client import bot as bot_instance
 
-    log_path = Path("/var/log/spanner-v2.log")
-    if not log_path.parent.exists():
-        log_path = Path("spanner-v2.log")
+    if Path("~/.local").exists():
+        log_path = Path("~/.local/share/spanner-v2/spanner.log")
+        log_path.mkdir(parents=True, exist_ok=True)
+    else:
+        log_path = Path("spanner.log")
     bot_instance.console.log("Log is located at [link file://%s]%s" % (log_path.absolute(), log_path))
 
     logging.basicConfig(
