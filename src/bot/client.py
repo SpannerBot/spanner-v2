@@ -80,8 +80,8 @@ class Bot(commands.Bot):
                 roles=False,  # can be overridden at message create level, so does not disable features.
                 replied_user=True,
             ),
-            debug_guilds=guild_ids,
-            owner_ids=owner_ids,
+            debug_guilds=guild_ids or None,
+            owner_ids=owner_ids or None,
         )
 
         self.debug = is_debug and guild_ids is not None and len(guild_ids) > 0
