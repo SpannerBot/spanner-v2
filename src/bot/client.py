@@ -41,6 +41,11 @@ class Bot(commands.Bot):
                 loaded = json.load(config_file)
                 self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
                 logger.debug("Loaded config.json")
+        elif Path("~/.config/spanner-v2/config.json").exists():
+            with Path("~/.config/spanner-v2/config.json").open() as config_file:
+                loaded = json.load(config_file)
+                self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
+                logger.debug("Loaded config.json from global config")
         else:
             logger.warning("No config.json file exists - falling back to environment variables")
             self.config = None
