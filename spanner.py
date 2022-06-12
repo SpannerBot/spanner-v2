@@ -33,12 +33,17 @@ def get_file_tree(directory: Path = None, tree: Tree = None) -> Tree:
     return tree
 
 
-@click.group()
+@click.command()
 def main():
-    click.echo("Hello!")
+    click.echo("Error: `spanner` is deprecated. You should use `spanner-cli`.")
 
 
-@main.group(name="info")
+@click.group()
+def cli():
+    pass
+
+
+@cli.group(name="info")
 def see_info():
     """Displays information about this instance"""
 
@@ -67,6 +72,7 @@ def version(verbose: bool = False):
         "py-cord version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(discord.version_info),
         "Python version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(sys.version_info),
         "\t- Executable: " + sys.executable,
+        "\t- Config: %s" % Path("./config.json").absolute(),
         "Spanner version: " + spanner_version,
         "System: " + platform.platform(),
     ]
@@ -87,7 +93,7 @@ def view_file_tree():
     Console().print(get_file_tree())
 
 
-@main.command(name="convert")
+@cli.command(name="convert")
 def convert_config():
     """Converts your old environment file to a config file"""
     new = {}
@@ -125,7 +131,7 @@ def convert_config():
         click.echo("You may want to edit config.json to make sure that this tool generated everything correctly.")
 
 
-@main.command(name="setup")
+@cli.command(name="setup")
 def make_setup():
     """Guides you though setting up the bot."""
     click.echo(
@@ -271,7 +277,7 @@ def make_setup():
     click.echo(f"All set! You can either run `{sys.executable} {sys.argv[0]} run`, or edit `config.json`!")
 
 
-@main.command()
+@cli.command()
 def run():
     """Starts the bot"""
     from src import launcher

@@ -17,7 +17,8 @@ setup(
     install_requires=requirements,
     entry_points={
         "console_scripts": [
-            "spanner = spanner:main",
+            "spanner-cli = spanner:cli",
+            "spanner = spanner:main"
         ],
     },
 )
