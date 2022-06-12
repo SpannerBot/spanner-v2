@@ -59,6 +59,7 @@ class Bot(commands.Bot):
                         "sqlite://" + str(cfg_dir / "spanner-v2" / "main.db")
                     )
                 )
+                self.console.log("database is now located at: %s" % str(cfg_dir / "spanner-v2" / "main.db"))
 
         super().__init__(
             command_prefix=utils.get_prefix,
