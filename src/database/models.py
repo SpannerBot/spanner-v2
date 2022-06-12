@@ -1,8 +1,5 @@
 import enum
-import time
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
 
 import databases
 import discord.utils
@@ -20,7 +17,7 @@ __all__ = (
     "SimplePoll",
 )
 
-models = orm.ModelRegistry(database=databases.Database("sqlite:///main.db"))
+models = orm.ModelRegistry(databases.Database("sqlite:///main.db"))
 DB_STAT = None
 
 

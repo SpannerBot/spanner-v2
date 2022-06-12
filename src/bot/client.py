@@ -49,6 +49,17 @@ class Bot(commands.Bot):
         guild_ids: Optional[List[int]] = self.get_config_value("slash_guilds") or None
         is_debug: bool = self.get_config_value("debug_mode", "debug")
 
+        if is_debug is False:
+            cfg_dir = Path("~/.config")
+            if cfg_dir.exists():
+                (cfg_dir / "spanner-v2").mkdir(exist_ok=True)
+                from databases import Database, DatabaseURL
+                db_model.database = Database(
+                    DatabaseURL(
+                        "sqlite://" + str(cfg_dir / "spanner-v2" / "main.db")
+                    )
+                )
+
         super().__init__(
             command_prefix=utils.get_prefix,
             description="eek's personal helper, re-written! | source code: https://github.com/EEKIM10/spanner-v2",
