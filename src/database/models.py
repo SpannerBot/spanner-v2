@@ -1,5 +1,7 @@
+import datetime
 import enum
 import uuid
+from typing import TYPE_CHECKING, Optional, Dict
 
 import databases
 import discord.utils
@@ -44,12 +46,19 @@ class Guild(orm.Model):
     tablename = "guilds"
     registry = models
     fields = {
-        "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4()),
+        "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4),
         "id": orm.BigInteger(unique=True, index=True),
         "prefix": orm.String(min_length=1, max_length=16, default="s!"),
         "log_channel": orm.BigInteger(allow_null=True, default=None),
         "disable_snipe": orm.Boolean(default=False),
     }
+
+    if TYPE_CHECKING:
+        entry_id: uuid.UUID
+        id: int
+        prefix: str
+        log_channel: Optional[int]
+        disable_snipe: bool
 
 
 class WelcomeMessage(orm.Model):
@@ -65,6 +74,15 @@ class WelcomeMessage(orm.Model):
         "delete_after": orm.Integer(default=None),
     }
 
+    if TYPE_CHECKING:
+        entry_id: uuid.UUID
+        id: int
+        guild: Guild
+        message: Optional[str]
+        embed_data: dict
+        ignore_bots: bool
+        delete_after: Optional[int]
+
 
 class ReactionRoles(orm.Model):
     tablename = "reaction_roles"
@@ -78,12 +96,21 @@ class ReactionRoles(orm.Model):
         "role": orm.BigInteger(default=None),
     }
 
+    if TYPE_CHECKING:
+        entry_id: uuid.UUID
+        id: int
+        guild: Guild
+        message_id: int
+        emoji: str
+        role: Optional[int]
+
 
 class Cases(orm.Model):
     registry = models
     fields = dict(
         entry_id=orm.UUID(primary_key=True, default=uuid.uuid4),
-        id=orm.Integer(allow_null=False, default=None),
+        # new_id=orm.BigInteger(default=discord.utils.generate_snowflake, unique=True),
+        id=orm.Integer(),
         guild=orm.ForeignKey(Guild),
         moderator=orm.BigInteger(),
         target=orm.BigInteger(),
@@ -92,6 +119,17 @@ class Cases(orm.Model):
         type=orm.Enum(CaseType, default=CaseType.WARN),
         expire_at=orm.DateTime(allow_null=True, default=None),
     )
+
+    if TYPE_CHECKING:
+        entry_id: uuid.UUID
+        id: int
+        guild: Guild
+        moderator: int
+        target: int
+        reason: str
+        created_at: datetime.datetime
+        type: CaseType
+        expire_at: Optional[datetime.datetime]
 
 
 class Errors(orm.Model):
@@ -114,6 +152,18 @@ class Errors(orm.Model):
         full_message=orm.String(min_length=2, max_length=4000, allow_null=True),
     )
 
+    if TYPE_CHECKING:
+        id: int
+        traceback_text: str
+        author: int
+        guild: Optional[int]
+        channel: Optional[int]
+        command: str
+        command_type: CommandType
+        permissions_channel: int
+        permissions_guild: int
+        full_message: Optional[str]
+
 
 class SimplePoll(orm.Model):
     registry = models
@@ -127,3 +177,13 @@ class SimplePoll(orm.Model):
         voted=orm.JSON(default={}),
         ended=orm.Boolean(default=False),
     )
+
+    if TYPE_CHECKING:
+        id: int
+        channel_id: Optional[int]
+        message: Optional[int]
+        guild_id: Optional[int]
+        owner: int
+        ends_at: float
+        voted: Dict[str, bool]
+        ended: bool
