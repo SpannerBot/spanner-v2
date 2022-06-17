@@ -348,6 +348,10 @@ class Info(commands.Cog):
         embeds.append(embed)
         return await ctx.respond(embeds=embeds)
 
+    @commands.user_command(name="User Info")
+    async def user_info_user_command(self, ctx: discord.ApplicationContext, user: Union[discord.User, discord.Member]):
+        return await self.user_info(ctx, user)
+
     @commands.slash_command(name="channel-info")
     async def channel_info(
         self,
