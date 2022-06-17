@@ -1,7 +1,7 @@
 import datetime
 import re
 import textwrap
-import uuid
+from typing import Optional, List
 
 import discord
 from discord import SlashCommandGroup
@@ -20,6 +20,13 @@ class PermissionsError(commands.CommandError):
         return self.reason
 
 
+async def case_id_autocomplete(ctx: discord.AutocompleteContext):
+    if not ctx.interaction.guild_id:
+        return
+    cases: List[Cases] = await Cases.objects.filter(guild__id=ctx.interaction.guild_id).limit(20).order_by("-id").all()
+    return [f"(#{case.id}) {str(case.entry_id).upper()}" for case in cases]
+
+
 class Moderation(commands.Cog):
     case_identifier_regex = re.compile(
         r"Case#[a-fA-F\d]{8}-[a-fA-F\d]{4}-[a-fA-F\d]{4}-[a-fA-F\d]{4}-[a-fA-F\d]{12}\|\s"
@@ -30,18 +37,16 @@ class Moderation(commands.Cog):
 
     @staticmethod
     async def get_next_case_id(guild: Guild) -> int:
-        last_case = await Cases.objects.filter(guild=guild).order_by("-id").first()
+        last_case = await Cases.objects.filter(guild=guild).order_by("-id").limit(2).first()
         if not last_case:
             return 1
         return last_case.id + 1
 
     @staticmethod
+    @discord.utils.deprecated("commands.[bot]_has_permissions and check_hierarchy")
     def check_action_permissions(
         author: discord.Member, target: discord.Member, permission_name: str, *, allow_self: bool = True
     ) -> bool:
-        # Step 1: Check if the bot has the required permissions.
-        if getattr(author.guild.me.guild_permissions, permission_name) is False:
-            raise PermissionsError(reason="I do not have the required permissions to perform this action.")
         # Step 2: Check if the author is immune to permissions checks.
         if author.guild_permissions.administrator:
             return True
@@ -60,19 +65,100 @@ class Moderation(commands.Cog):
                     )
         return True
 
+    @staticmethod
+    def check_hierarchy(
+        subject: discord.Member,
+        target: discord.Member,
+        cannot_be_equal: bool = False,
+        ignore_if_subject_is_owner: bool = True,
+    ) -> bool:
+        """
+        Checks role hierarchy is in-tact.
+
+        :param subject: The person who must have the higher role, usually the author.
+        :param target: The person who we are comparing roles with; Usually the command target.
+        :param cannot_be_equal: If True, this means that the roles cannot be of the same level; subject > target.
+        :param ignore_if_subject_is_owner: If True
+        :return: ``True`` if the correct conditions are met.
+        """
+        if ignore_if_subject_is_owner and subject.guild.owner_id == subject.id:
+            return True
+
+        if cannot_be_equal:
+            comparison = subject.top_role.__gt__
+        else:
+            comparison = subject.top_role.__ge__
+
+        return comparison(target.top_role)
+
+    def get_log_channel(self, guild: Guild) -> Optional[discord.TextChannel]:
+        log_channel_id = guild.log_channel
+        if log_channel_id is not None:
+            log_channel: Optional[discord.TextChannel] = self.bot.get_channel(log_channel_id)
+            if log_channel is not None:
+                if log_channel.can_send(discord.Embed):
+                    return log_channel
+
+    @staticmethod
+    def generate_case_log_embed(ctx: discord.ApplicationContext, case: Cases) -> discord.Embed:
+        embed = discord.Embed(
+            title=f"Case #{case.id} - {case.type.name.replace('_', '-').title()}",
+            description=f"**Moderator**: <@{case.moderator}> (`{case.moderator}`)\n"
+            f"**Target**: <@{case.target}> (`{case.target}`)\n"
+            f"**Created**: {discord.utils.format_dt(discord.utils.utcnow(), 'R')}\n"
+            f"**Type**: {case.type.name.replace('_', '-').lower()}",
+            colour=discord.Colour.blurple(),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_author(name=ctx.author, icon_url=(ctx.author.avatar or ctx.author.default_avatar).url)
+
+        if case.expire_at:
+            embed.description += f"\n**Expires:** {discord.utils.format_dt(case.expire_at, 'R')}"
+
+        paginator = commands.Paginator("", "", 1024)
+        for line in case.reason.splitlines():
+            paginator.add_line(textwrap.shorten(line, 1024, placeholder="..."))
+
+        if paginator.pages:
+            embed.add_field(name="Reason:", value=paginator.pages[0], inline=False)
+            if len(paginator.pages) != 1:
+                for page in paginator.pages[1:]:
+                    embed.add_field(name="\u200b", value=page, inline=False)
+
+        return embed
+
+    async def log_event(self, guild: Guild, *, embed: discord.Embed):
+        log_channel = self.get_log_channel(guild)
+        if log_channel:
+            return await log_channel.send(embed=embed)
+
+    async def log_case(self, ctx: discord.ApplicationContext, case: Cases):
+        """Sends a case to the log channel of the current server."""
+        await case.guild.load()
+        embed = self.generate_case_log_embed(ctx, case)
+        log_channel = self.get_log_channel(case.guild)
+        if log_channel is not None:
+            await log_channel.send(embed=embed)
+
     @commands.slash_command(name="warn")
     @discord.default_permissions(moderate_members=True)
+    @commands.bot_has_permissions(send_messages=True)
     async def warn(
-        self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided."
+        self,
+        ctx: discord.ApplicationContext,
+        member: discord.Option(discord.Member, description="The member you want to warn."),
+        *,
+        reason: discord.Option(str, description="The reason for the warning.", default="No Reason Provided."),
     ):
         """Sends a member a warning and adds it to their log."""
-        try:
-            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
+        if ctx.author == member:
+            return await ctx.respond("You can't warn yourself, dumbass.", ephemeral=True)
+        elif self.check_hierarchy(ctx.author, member) is False:
+            return await ctx.respond(f"You must have a higher role than {member.mention}'s.", ephemeral=True)
+
         await ctx.defer(ephemeral=True)
 
-        guild = await utils.get_guild(ctx.guild)
+        guild = await utils.get_guild_config(ctx.guild)
         case = await Cases.objects.create(
             id=await self.get_next_case_id(guild),
             guild=guild,
@@ -93,6 +179,8 @@ class Moderation(commands.Cog):
             name="Think this is incorrect?", value=f"Your case ID is `{case.id}` - you can speak to a moderator."
         )
 
+        await self.log_case(ctx, case)
+
         try:
             await member.send(embed=embed)
         except discord.Forbidden:
@@ -112,17 +200,11 @@ class Moderation(commands.Cog):
         self,
         ctx: discord.ApplicationContext,
         user: discord.Option(discord.User, description="The user to ban. You should provide their ID."),
-        *,
-        reason: str = "No Reason Provided",
+        reason: discord.Option(str, description="The reason for the ban.", default="No Reason Provided."),
     ):
         """Bans a user by their ID before they can enter the server."""
-        try:
-            self.check_action_permissions(ctx.user, ctx.user, "ban_members")
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
-
-        if await discord.utils.get_or_fetch(ctx.guild, "member", user.id, default=None):
-            return await ctx.respond("User is already in the server. Please use regular /ban.", ephemeral=True)
+        if member := await discord.utils.get_or_fetch(ctx.guild, "member", user.id, default=None):
+            return await self.ban(ctx, member, 7, reason)
 
         view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond(
@@ -146,6 +228,8 @@ class Moderation(commands.Cog):
             type=CaseType.BAN,
         )
 
+        await self.log_case(ctx, case)
+
         try:
             await ctx.guild.ban(user, reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=7)
         except discord.HTTPException as e:
@@ -168,20 +252,15 @@ class Moderation(commands.Cog):
         ctx: discord.ApplicationContext,
         user: discord.Option(discord.User, description="The user to unban. You should pass their user ID."),
         *,
-        reason: str = "No Reason Provided",
+        reason: discord.Option(str, description="The reason for the unban.", default="No Reason Provided."),
     ):
         """Unbans a user."""
-        try:
-            self.check_action_permissions(ctx.user, ctx.user, "ban_members")
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
-
         try:
             ban = await ctx.guild.fetch_ban(discord.Object(id=user.id))
         except discord.NotFound:
             return await ctx.respond("User is not banned.", ephemeral=True)
         else:
-            guild = await utils.get_guild(ctx.guild)
+            guild = await utils.get_guild_config(ctx.guild)
             if ban.reason:
                 ban_reason = self.case_identifier_regex.sub("", ban.reason, 1)
             else:
@@ -207,6 +286,7 @@ class Moderation(commands.Cog):
                     reason=reason,
                     type=CaseType.UN_BAN,
                 )
+                await self.log_case(ctx, case)
                 await ctx.guild.unban(ban.user, reason=f"Case#{case.entry_id}| " + reason)
                 return await ctx.edit(
                     content="User {!s} has been unbanned.\nCase ID: {!s}".format(user, case.id),
@@ -221,18 +301,20 @@ class Moderation(commands.Cog):
     async def ban(
         self,
         ctx: discord.ApplicationContext,
-        member: discord.Member,
+        member: discord.Option(discord.Member, description="The member you want to ban."),
         delete_messages: discord.Option(
-            int, description="How many days of their recent messages to delete", default=7, min_value=0, max_value=7
+            int,
+            description="How many days of their recent messages to delete",
+            default=7,
+            min_value=0,
+            max_value=7,
+            autocomplete=discord.utils.basic_autocomplete([0, 1, 2, 3, 4, 5, 6, 7]),
         ),
-        reason: str = "No Reason Provided",
+        reason: discord.Option(str, description="The reason for the ban.", default="No Reason Provided."),
     ):
         """Bans a member from the server."""
-        try:
-            self.check_action_permissions(ctx.user, member, "ban_members", allow_self=False)
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
-
+        if not self.check_hierarchy(ctx.author, member, cannot_be_equal=True):
+            return await ctx.respond(f"You must have a higher role than {member.mention} to ban them.")
         try:
             await ctx.guild.fetch_ban(member)
             return await ctx.respond("User is already banned.", ephemeral=True)
@@ -259,6 +341,8 @@ class Moderation(commands.Cog):
                 type=CaseType.BAN,
             )
 
+            await self.log_case(ctx, case)
+
             try:
                 await member.ban(reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=delete_messages)
             except discord.HTTPException as e:
@@ -277,12 +361,14 @@ class Moderation(commands.Cog):
     @commands.has_permissions(kick_members=True)
     @commands.bot_has_permissions(kick_members=True)
     async def kick(
-        self, ctx: discord.ApplicationContext, member: discord.Member, *, reason: str = "No Reason Provided"
+        self,
+        ctx: discord.ApplicationContext,
+        member: discord.Option(discord.Member, description="The member you want to kick."),
+        *,
+        reason: discord.Option(str, description="The reason for the ban.", default="No Reason Provided."),
     ):
-        try:
-            self.check_action_permissions(ctx.user, member, "kick_members", allow_self=False)
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
+        if not self.check_hierarchy(ctx.author, member, cannot_be_equal=True):
+            return await ctx.respond(f"You must have a higher role than {member.mention} to kick them.")
 
         view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond(
@@ -315,6 +401,7 @@ class Moderation(commands.Cog):
             await case.delete()
             raise
         else:
+            await self.log_case(ctx, case)
             return await ctx.edit(
                 content="User {!s} has been kicked.\nCase ID: {!s}".format(member, case.id), embed=None, view=None
             )
@@ -324,16 +411,15 @@ class Moderation(commands.Cog):
     async def mute(
         self,
         ctx: discord.ApplicationContext,
-        member: discord.Member,
+        member: discord.Option(discord.Member, description="The member you want to kick."),
         time: discord.Option(
-            str, description="How long to mute this member for. Example: `1h30m` (1 hour and 30 minutes)."
+            str, description="How long to mute this member for. Example: `1h30m` (1 hour and 30 minutes).", name="for"
         ),
-        reason: str = "No Reason Provided",
+        reason: discord.Option(str, description="The reason for the ban.", default="No Reason Provided."),
     ):
-        try:
-            self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
+        """Mutes (time-outs) a user for the specified period of time."""
+        if not self.check_hierarchy(ctx.author, member, cannot_be_equal=True):
+            return await ctx.respond(f"You must have a higher role than {member.mention} to kick them.")
 
         try:
             seconds = utils.parse_time(time)
@@ -357,7 +443,7 @@ class Moderation(commands.Cog):
             return
         await ctx.edit(view=None)
 
-        guild = await utils.get_guild(ctx.guild)
+        guild = await utils.get_guild_config(ctx.guild)
         case = await Cases.objects.create(
             id=await self.get_next_case_id(guild),
             guild=guild,
@@ -367,6 +453,7 @@ class Moderation(commands.Cog):
             type=CaseType.TEMP_MUTE,
             expire_at=end,
         )
+        await self.log_case(ctx, case)
 
         try:
             end = discord.utils.utcnow() + datetime.timedelta(seconds=seconds)  # recalculate
@@ -387,11 +474,14 @@ class Moderation(commands.Cog):
 
     @commands.slash_command(name="unmute")
     @discord.default_permissions(moderate_members=True)
-    async def unmute(self, ctx: discord.ApplicationContext, member: discord.Member, reason: str = "No Reason Provided"):
-        try:
-            self.check_action_permissions(ctx.user, member, "moderate_members", allow_self=False)
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
+    async def unmute(
+        self,
+        ctx: discord.ApplicationContext,
+        member: discord.Option(discord.Member, description="The member you want to unmute."),
+        reason: discord.Option(str, description="The reason for the ban.", default="No Reason Provided."),
+    ):
+        if not self.check_hierarchy(ctx.author, member):
+            return await ctx.respond(f"You must have a higher role than or equal to {member.mention} to kick them.")
 
         end = member.communication_disabled_until
 
@@ -408,7 +498,7 @@ class Moderation(commands.Cog):
             return
         await ctx.edit(view=None)
 
-        guild = await utils.get_guild(ctx.guild)
+        guild = await utils.get_guild_config(ctx.guild)
         case = await Cases.objects.create(
             id=await self.get_next_case_id(guild),
             guild=guild,
@@ -417,6 +507,7 @@ class Moderation(commands.Cog):
             reason=reason,
             type=CaseType.UN_MUTE,
         )
+        await self.log_case(ctx, case)
 
         try:
             await member.remove_timeout(reason=f"Case#{case.entry_id!s}| " + reason)
@@ -436,17 +527,27 @@ class Moderation(commands.Cog):
     )
 
     @cases_group.command(name="delete")
-    async def delete_case(self, ctx: discord.ApplicationContext, case_id: int):
+    async def delete_case(
+        self,
+        ctx: discord.ApplicationContext,
+        case_id: discord.Option(
+            str,
+            description="The case ID you want to delete",
+            autocomplete=discord.utils.basic_autocomplete(case_id_autocomplete),
+        ),
+    ):
+        """Deletes a case from records."""
+        await ctx.defer(ephemeral=True)
+        case_id = re.match(r"\(#(\d+)\)", case_id).group(1)
+        guild = await utils.get_guild_config(ctx.guild)
         try:
-            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
-
-        guild = await utils.get_guild(ctx.guild)
-        try:
-            case = await Cases.objects.get(id=case_id, guild=guild)
+            case: Cases = await Cases.objects.get(id=case_id, guild=guild)
         except NoMatch:
             return await ctx.respond("Case not found.", ephemeral=True)
+
+        if case.moderator != ctx.author.id:
+            if not ctx.author.guild_permissions.administrator:
+                return await ctx.respond("You must be an administrator to manage other people's cases.", ephemeral=True)
 
         view = YesNoPrompt(ctx.interaction, timeout=300.0)
         await ctx.respond("Are you sure you would like to delete case #{!s}?".format(case.entry_id), view=view)
@@ -454,23 +555,36 @@ class Moderation(commands.Cog):
         if not view.confirm:
             return await ctx.edit(content="Case deletion cancelled.", view=None)
         await case.delete()
+        await self.log_event(
+            guild,
+            embed=discord.Embed(
+                title=f"\N{WASTEBASKET}\U0000fe0f"
+                f"{ctx.author} deleted case #{case.id} ({case.type.name.replace('_', '-').title()}) by "
+                f"{await self.bot.get_or_fetch_user(case.moderator)}.",
+                colour=discord.Colour.red(),
+                timestamp=discord.utils.utcnow(),
+            ),
+        )
         return await ctx.edit(content="Deleted case #{!s}.".format(case.entry_id), view=None)
 
     @cases_group.command(name="view")
-    async def get_case(self, ctx: discord.ApplicationContext, case_id: str):
+    async def get_case(
+        self,
+        ctx: discord.ApplicationContext,
+        case_id: discord.Option(
+            str,
+            description="The case ID you want to view.",
+            autocomplete=discord.utils.basic_autocomplete(case_id_autocomplete),
+        ),
+    ):
+        """Displays details on a provided case."""
+        await ctx.defer(ephemeral=True)
+        case_id = re.match(r"\(#(\d+)\)", case_id).group(1)
+        guild = await utils.get_guild_config(ctx.guild)
         try:
-            self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
-        except PermissionsError as e:
-            return await ctx.respond(str(e), ephemeral=True)
-
-        guild = await utils.get_guild(ctx.guild)
-        try:
-            case = await Cases.objects.get(id=case_id, guild=guild)
+            case: Cases = await Cases.objects.get(id=case_id, guild=guild)
         except NoMatch:
-            try:
-                case = await Cases.objects.get(entry_id=uuid.UUID(case_id), guild=guild)
-            except (NoMatch, ValueError):
-                return await ctx.respond("Case not found.", ephemeral=True)
+            return await ctx.respond("Case not found.", ephemeral=True)
 
         moderator = await self.bot.get_or_fetch_user(case.moderator)
         target = await self.bot.get_or_fetch_user(case.target)
@@ -491,17 +605,72 @@ class Moderation(commands.Cog):
         embed.set_footer(text=target.name, icon_url=target.avatar.url)
         return await ctx.respond(embed=embed, ephemeral=True)
 
+    @cases_group.command(name="edit")
+    async def edit_case(
+        self,
+        ctx: discord.ApplicationContext,
+        case_id: discord.Option(
+            str,
+            description="The case ID you want to edit.",
+            autocomplete=discord.utils.basic_autocomplete(case_id_autocomplete),
+        ),
+        new_reason: discord.Option(
+            str,
+            description="The new reason for this case.",
+            required=False,
+            default=...,
+        ),
+    ):
+        """Edits the details of a case."""
+        await ctx.defer(ephemeral=True)
+        case_id = re.match(r"\(#(\d+)\)", case_id).group(1)
+        guild = await utils.get_guild_config(ctx.guild)
+        try:
+            case: Cases = await Cases.objects.get(id=case_id, guild=guild)
+        except NoMatch:
+            return await ctx.respond("Case not found.", ephemeral=True)
+
+        if case.moderator != ctx.author.id:
+            if not ctx.author.guild_permissions.administrator:
+                return await ctx.respond("You must be an administrator to manage other people's cases.", ephemeral=True)
+
+        changes = []
+
+        if new_reason is not ...:
+            await case.update(reason=new_reason)
+            changes.append("reason")
+
+        if len(changes) != 0:
+            await self.log_event(
+                guild,
+                embed=discord.Embed(
+                    title=f"\N{MEMO}"
+                    f"{ctx.author} edited case #{case.id} ({case.type.name.replace('_', '-').title()}) by "
+                    f"{await self.bot.get_or_fetch_user(case.moderator)}.",
+                    description=f"Changes: {', '.join(changes)}",
+                    colour=discord.Colour.orange(),
+                    timestamp=discord.utils.utcnow(),
+                ),
+            )
+            return await ctx.respond("\N{white heavy check mark} Changes saved.", ephemeral=True)
+
     cases_list = cases_group.create_subgroup("list", "List cases matching a criteria")
 
     @cases_list.command(name="all")
-    async def list_cases(self, ctx: discord.ApplicationContext, per_page: int = 10):
+    async def list_cases(
+        self,
+        ctx: discord.ApplicationContext,
+        per_page: discord.Option(
+            int, description="The number of cases to show per page.", default=10, min_value=1, max_value=25
+        ),
+    ):
         """Lists all cases for this guild"""
         try:
             self.check_action_permissions(ctx.user, ctx.user, "moderate_members")
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
-        guild = await utils.get_guild(ctx.guild)
+        guild = await utils.get_guild_config(ctx.guild)
         cases = await Cases.objects.filter(guild=guild).order_by("-id").all()
         if not cases:
             return await ctx.respond("No cases found.", ephemeral=True)
@@ -555,7 +724,7 @@ class Moderation(commands.Cog):
         except PermissionsError as e:
             return await ctx.respond(str(e), ephemeral=True)
 
-        guild = await utils.get_guild(ctx.guild)
+        guild = await utils.get_guild_config(ctx.guild)
         cases = await Cases.objects.filter(guild=guild, target=user.id).order_by("-id").all()
         if not cases:
             return await ctx.respond("No cases found.", ephemeral=True)

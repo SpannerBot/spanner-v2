@@ -59,11 +59,8 @@ class Bot(commands.Bot):
             if cfg_dir.exists():
                 (cfg_dir / "spanner-v2").mkdir(exist_ok=True)
                 from databases import Database, DatabaseURL
-                db_model.database = Database(
-                    DatabaseURL(
-                        "sqlite://" + str(cfg_dir / "spanner-v2" / "main.db")
-                    )
-                )
+
+                db_model.database = Database(DatabaseURL("sqlite://" + str(cfg_dir / "spanner-v2" / "main.db")))
                 self.console.log("database is now located at: %s" % str(cfg_dir / "spanner-v2" / "main.db"))
 
         super().__init__(

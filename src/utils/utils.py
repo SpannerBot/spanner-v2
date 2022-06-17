@@ -138,7 +138,9 @@ async def run_blocking(func: Callable, *args, **kwargs) -> Optional[Any]:
     return await bot.loop.run_in_executor(None, partial(func, *args, **kwargs))
 
 
-async def get_guild_config(guild_id: typing.Union[discord.ApplicationContext, commands.Context, discord.Guild, int]):
+async def get_guild_config(
+    guild_id: typing.Union[discord.ApplicationContext, commands.Context, discord.Guild, int]
+) -> Guild:
     """
     Fetches a guild's configuration.
 
