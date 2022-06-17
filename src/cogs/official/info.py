@@ -272,29 +272,6 @@ class Info(commands.Cog):
 
             return await ctx.respond(None, embeds=embeds, files=files)
 
-    @commands.slash_command(name="whois")
-    async def whois(self, ctx: discord.ApplicationContext, user: str):
-        """Finds a user based on their ID"""
-        try:
-            user = await utils.converters.UserConverter().convert(ctx, user)
-        except commands.UserNotFound:
-            return await ctx.respond(
-                "That user does not exist.\nTIP: for more accurate results, try using the user's "
-                "ID, since that will always return a result if the ID is correct. If you do not"
-                " have the user's ID, you can try their username#discriminator pair, like"
-                f" `{ctx.user!s}`, however this will only work if the bot shares a mutual server with them."
-            )
-
-        embed = discord.Embed(
-            title=f"{user}'s information:",
-            description="\n".join(self.get_user_data(user, ctx.guild)),
-            colour=user.colour,
-            timestamp=user.created_at,
-        )
-        embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
-        return await ctx.respond(embed=embed)
-
     @commands.slash_command(name="user-info")
     async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
         """Shows you information about a user."""
