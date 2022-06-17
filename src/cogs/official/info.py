@@ -553,7 +553,6 @@ class Info(commands.Cog):
             f"**Managed By Integration?** {utils.Emojis.bool(role.managed)}",
             f"**Position**: {role.position}",
             f"**Created**: <t:{round(role.created_at.timestamp())}:R>",
-            f"**Members**: {len(role.members)}",
             f"**Permissions**: {self.hyperlink(permissions_endpoint % role.permissions.value, 'View Online')}",
         ]
         if role.managed:
