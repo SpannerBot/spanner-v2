@@ -14,7 +14,7 @@ import discord
 import httpx
 import unicodedata
 from bs4 import BeautifulSoup
-from discord.ext import commands
+from discord.ext import commands, pages
 
 from src import utils
 from src.bot.client import Bot
@@ -822,7 +822,6 @@ class Info(commands.Cog):
     @commands.message_command(name="Emoji Info")
     async def emoji_info_message_command(self, ctx: discord.ApplicationContext, message: discord.Message):
         await ctx.defer(ephemeral=True)
-        found = False
         embeds = []
         for word in re.finditer(r"<(a?):([\w_]{1,32}):(\d{15,20})>", message.content):
             try:
@@ -847,24 +846,17 @@ class Info(commands.Cog):
                     # noinspection PyTypeChecker
                     emoji_full = await commands.EmojiConverter().convert(ctx, str(emoji.id))
                 except commands.EmojiNotFound:
-                    emoji_full = None
+                    pass
                 else:
                     e.description += f"**Server name:** {emoji_full.guild.name if emoji_full.guild else 'N/A'}\n"
                 e.set_image(url=str(emoji.url))
-                if ctx.guild:
-                    if ctx.author.guild_permissions.manage_emojis:
-                        if ctx.author.guild_permissions.manage_emojis:
-                            if len(ctx.guild.emojis) < ctx.guild.emoji_limit:
-                                if getattr(emoji_full, "guild", None) != ctx.guild:
-                                    if discord.utils.get(ctx.guild.emojis, name=emoji.name) is None:
-                                        view = StealEmojiView(ctx.interaction, emoji=emoji_full or emoji)
-                                        await ctx.respond(embed=e, view=view, ephemeral=True)
-                                        continue
                 embeds.append(e)
-                found = True
-        if embeds:
-            for embed_chunk in discord.utils.as_chunks(embeds, 10):
-                await ctx.respond(embeds=embed_chunk, ephemeral=True)
+
+        paginator = pages.Paginator(
+            embeds,
+            disable_on_timeout=True
+        )
+        await paginator.respond(ctx.interaction, ephemeral=True)
 
 
 def setup(bot):
