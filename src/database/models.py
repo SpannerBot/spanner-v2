@@ -36,10 +36,13 @@ class CaseType(enum.IntEnum):
 
 
 class CommandType(enum.Enum):
+    UNKNOWN = "unknown"
     TEXT = "text"
     SLASH = "slash"
     USER = "user context"
     MESSAGE = "message context"
+    AUTOCOMPLETE = "autocomplete"
+    MODAL = "modal context"
 
 
 class Guild(orm.Model):
@@ -66,12 +69,11 @@ class WelcomeMessage(orm.Model):
     registry = models
     fields = {
         "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4),
-        "id": orm.BigInteger(unique=True, index=True),  # guild_id
         "guild": orm.ForeignKey(Guild),
-        "message": orm.String(min_length=1, max_length=4029, default=None),
+        "message": orm.String(min_length=1, max_length=4029, default=None, allow_null=True),
         "embed_data": orm.JSON(default={"type": "auto"}),
         "ignore_bots": orm.Boolean(default=False),
-        "delete_after": orm.Integer(default=None),
+        "delete_after": orm.Integer(default=3600 * 6),
     }
 
     if TYPE_CHECKING:

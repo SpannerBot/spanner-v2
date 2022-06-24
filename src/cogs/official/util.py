@@ -5,7 +5,7 @@ import sys
 import textwrap
 from collections import deque
 from datetime import timedelta
-from typing import Dict, List, Literal, Optional, Union
+from typing import Dict, List, Literal
 
 import discord
 from discord import SlashCommandGroup
@@ -20,39 +20,6 @@ from src.utils.views import SimplePollView
 from src.vendor.humanize.size import naturalsize
 
 logger = logging.getLogger(__name__)
-
-
-async def purge(channel: discord.TextChannel, limit: int = 1000, **kwargs) -> Optional[List[discord.Message]]:
-    async def run_purge():
-        return await channel.purge(limit=limit, **kwargs)
-
-    try:
-        return await asyncio.wait_for(run_purge(), 300)  # running a purge for more than 5 minutes is a bit OTT
-    except asyncio.TimeoutError:
-        return
-
-
-async def purge_permission_check(ctx: discord.ApplicationContext) -> bool:
-    if not ctx.guild:
-        await ctx.respond("Purge cannot be used in direct messages.")
-        return False
-
-    if not ctx.channel.permissions_for(ctx.user).manage_messages:
-        await ctx.respond("You do not have permission to delete messages in this channel.", ephemeral=True)
-        return False
-
-    bot_perms = discord.Permissions(read_messages=True, read_message_history=True, manage_messages=True)
-    if not ctx.channel.permissions_for(ctx.me).is_superset(bot_perms):
-        await ctx.respond(
-            "I am missing permissions to purge in this channel. Please check that I have:\n"
-            "\N{BULLET} Read messages\n"
-            "\N{BULLET} Read message history\n"
-            "\N{BULLET} Manage messages",
-            ephemeral=True,
-        )
-        return False
-
-    return True
 
 
 class Utility(commands.Cog):
@@ -261,53 +228,170 @@ class Utility(commands.Cog):
     purge = SlashCommandGroup(
         "purge",
         "Bulk deletes lots of messages at once.",
-        default_member_permissions=discord.Permissions(manage_messages=True),
+        default_member_permissions=discord.Permissions(
+            manage_messages=True, read_messages=True, read_message_history=True
+        ),
+        guild_only=True,
     )
 
-    @purge.command()
+    @purge.command(name="number")
+    @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
     async def limit(
         self,
         ctx: discord.ApplicationContext,
         max_search: Option(
             int, "How many messages to delete. Defaults to 100.", min_value=10, max_value=5000, default=100
         ),
+        ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
     ):
         """Deletes up to <max_search> messages."""
-        if not await purge_permission_check(ctx):
-            return
 
         await ctx.defer(ephemeral=True)
-        messages = await purge(ctx.channel, limit=max_search)
-        if messages is None:
-            return await ctx.respond(
-                "Failed to purge - exceeded maximum time (5 minutes).\n"
-                "If you need to delete LOTS of messages, discord recommends you clone the channel"
-                " instead.",
-                ephemeral=True,
-            )
-        else:
+        messages = await ctx.channel.purge(
+            limit=max_search,
+            check=lambda _m: (_m.pinned is False) if ignore_pinned else True,
+            reason=f"Authorised by {ctx.author}.",
+        )
+        authors = [x.author.id for x in messages]
+        authors_count = {}
+        for author in authors:
+            authors_count[author] = authors_count.get(author, 0) + 1
+        top_authors = list(set(authors))
+        top_authors.sort(key=lambda a: authors_count[a], reverse=True)
+        top_authors = top_authors[:10]
+        value = f"Deleted {len(messages):,} messages.\nAuthor breakdown:\n" + "\n".join(
+            f"<@{uid}>: {authors_count[uid]:,} ({round(authors_count[uid] / len(messages))}% of messages)"
+            for uid in top_authors
+        )
+        return await ctx.respond(value, ephemeral=True)
 
-            def get_page(message: discord.Message) -> Union[discord.Embed, List[discord.Embed]]:
-                embed = discord.Embed(
-                    title=f"Message from {message.author}",
-                    description=message.content or "no content",
-                    colour=message.author.colour,
-                    timestamp=message.created_at,
+    @commands.message_command(name="Delete after this")
+    @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    @commands.has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    @discord.default_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    async def purge_after_message(self, ctx: discord.ApplicationContext, message: discord.Message):
+        max_messages = None
+        ignore_pins = True
+
+        class MaxMessagesModal(discord.ui.Modal):
+            def __init__(self):
+                super().__init__(
+                    discord.ui.InputText(
+                        label="Maximum messages to delete:",
+                        placeholder="Enter a number between 1 and 5,000.",
+                        min_length=1,
+                        max_length=4,
+                        value="100",
+                    ),
+                    discord.ui.InputText(
+                        label="Ignore pinned messages?",
+                        placeholder="Yes or No",
+                        min_length=2,
+                        max_length=3,
+                        value="Yes",
+                    ),
+                    title="Purge settings",
                 )
-                embed.set_author(name=message.author.display_name, icon_url=message.author.display_avatar.url)
 
-                footer_text = message.guild.name
-                if message.edited_at:
-                    footer_text += f" \N{BULLET} Message was edited: {discord.utils.format_dt(message.edited_at)}"
+            async def callback(self, interaction: discord.Interaction):
+                nonlocal max_messages, ignore_pins
+                max_messages = min(5000, max(0, int(self.children[0].value)))
+                ignore_pins = self.children[1].value[0].lower() == "y"
+                ctx.interaction = interaction
+                self.stop()
 
-                embed.set_footer(text=footer_text, icon_url=ctx.guild.icon.url)
+        modal = MaxMessagesModal()
+        await ctx.send_modal(modal)
+        try:
+            await asyncio.wait_for(modal.wait(), timeout=120)
+        except asyncio.TimeoutError:
+            return
+        await ctx.defer()
+        messages = await ctx.channel.purge(
+            limit=max_messages,
+            check=lambda _m: (_m.pinned is False) if ignore_pins else True,
+            reason=f"Authorised by {ctx.author}.",
+            after=message,
+        )
+        authors = [x.author.id for x in messages]
+        authors_count = {}
+        for author in authors:
+            authors_count[author] = authors_count.get(author, 0) + 1
+        top_authors = list(set(authors))
+        top_authors.sort(key=lambda a: authors_count[a], reverse=True)
+        top_authors = top_authors[:10]
+        value = (
+            f"Deleted {len(messages):,} messages after [this message]({message.jump_url}).\nAuthor breakdown:\n"
+            + "\n".join(
+                f"<@{uid}>: {authors_count[uid]:,} ({round(authors_count[uid] / len(messages) * 100)}% of messages)"
+                for uid in top_authors
+            )
+        )
+        return await ctx.respond(value, embed=None)
 
-                if len(list(filter(lambda e: e.type == "rich", message.embeds))) != 0:
-                    return [embed, *list(filter(lambda e: e.type == "rich", message.embeds))]
-                return embed
+    @commands.message_command(name="Delete before this")
+    @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    @commands.has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    @discord.default_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    async def purge_before_message(self, ctx: discord.ApplicationContext, message: discord.Message):
+        max_messages = None
+        ignore_pins = True
 
-            paginator = pages.Paginator([get_page(x) for x in messages])
-            return await paginator.respond(ctx.interaction, ephemeral=True)
+        class MaxMessagesModal(discord.ui.Modal):
+            def __init__(self):
+                super().__init__(
+                    discord.ui.InputText(
+                        label="Maximum messages to delete:",
+                        placeholder="Enter a number between 1 and 5,000.",
+                        min_length=1,
+                        max_length=4,
+                        value="100",
+                    ),
+                    discord.ui.InputText(
+                        label="Ignore pinned messages?",
+                        placeholder="Yes or No",
+                        min_length=2,
+                        max_length=3,
+                        value="Yes",
+                    ),
+                    title="Purge settings",
+                )
+
+            async def callback(self, interaction: discord.Interaction):
+                nonlocal max_messages, ignore_pins
+                max_messages = min(5000, max(0, int(self.children[0].value)))
+                ignore_pins = self.children[1].value[0].lower() == "y"
+                ctx.interaction = interaction
+                self.stop()
+
+        modal = MaxMessagesModal()
+        await ctx.send_modal(modal)
+        try:
+            await asyncio.wait_for(modal.wait(), timeout=120)
+        except asyncio.TimeoutError:
+            return
+        await ctx.defer()
+        messages = await ctx.channel.purge(
+            limit=max_messages,
+            check=lambda _m: (_m.pinned is False) if ignore_pins else True,
+            reason=f"Authorised by {ctx.author}.",
+            before=message,
+        )
+        authors = [x.author.id for x in messages]
+        authors_count = {}
+        for author in authors:
+            authors_count[author] = authors_count.get(author, 0) + 1
+        top_authors = list(set(authors))
+        top_authors.sort(key=lambda a: authors_count[a], reverse=True)
+        top_authors = top_authors[:10]
+        value = (
+            f"Deleted {len(messages):,} messages before [this message]({message.jump_url}).\nAuthor breakdown:\n"
+            + "\n".join(
+                f"<@{uid}>: {authors_count[uid]:,} ({round(authors_count[uid] / len(messages) * 100)}% of messages)"
+                for uid in top_authors
+            )
+        )
+        return await ctx.respond(value, embed=None)
 
     @commands.slash_command(name="simple-poll")
     async def simple_poll(

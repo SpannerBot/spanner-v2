@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import re
 import sys
 import traceback
@@ -12,11 +13,6 @@ import httpx
 from discord.ext import commands
 
 from src.database.models import Guild, CommandType, Errors
-
-try:
-    import zlib
-except ImportError:
-    zlib = None
 
 __all__ = (
     "case_type_names",
@@ -32,6 +28,8 @@ __all__ = (
     "MaxConcurrency",
     "get_guild_config",
     "load_colon_int_list",
+    "TimeFormat",
+    "avatar",
 )
 
 case_type_names = {
@@ -185,27 +183,61 @@ def format_time(seconds: int):
     return ", ".join(values)
 
 
-TIME_REGEX = re.compile(
-    r"(?P<len>\d+(\.(\d{0,8}))?)(\s){0,2}(?P<span>(s(ec(ond)?)?|m(in(ute)?)?|h((ou)?r)?|d(ay)?|w(eek)?)(s)?)",
-    re.IGNORECASE | re.VERBOSE,
-)
-TIMESPANS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "y": 31536000}
+class TimeFormat:
+    # TIME_DEFINITE_REGEX = re.compile(
+    #     r"^((?P<date>\d{1,2}/\d{1,2}/\d{2,4})?\sat\s)?(?P<time>\d{1,2}(:\d{2})?(am|pm)?)$"
+    # )
+    TIME_RELATIVE_REGEX = re.compile(
+        r"(?P<len>\d+(\.(\d{0,8}))?)(\s){0,2}(?P<span>(s(ec(ond)?)?|m(in(ute)?)?|h((ou)?r)?|d(ay)?|w(eek)?)(s)?)",
+        re.IGNORECASE | re.VERBOSE,
+    )
+    TIMESPANS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "y": 31536000}
+
+    @staticmethod
+    def parse_relative(time: str) -> int:
+        """Parses a timespan (e.g. 1d, 3 hours) into seconds.
+
+        Arguments:
+            time: str - the provided relative time (like 1h30m)
+        Returns:
+            int - The converted time in seconds.
+        Raises:
+            ValueError - the time format was invalid
+        """
+        time = time.strip()
+        matches = tuple(TimeFormat.TIME_RELATIVE_REGEX.finditer(time))
+        if len(matches) == 0:
+            raise ValueError("Invalid time format")
+
+        total_seconds = 0
+        for match in matches:
+            length = int(match.group("len"))
+            span = match.group("span").lower()[0]
+            total_seconds += length * TimeFormat.TIMESPANS[span]
+
+        return total_seconds
+
+    @staticmethod
+    def parse_definite(time: str) -> Optional[datetime.datetime]:
+        """Similar to parse_relative, except returns a datetime"""
+        formats = ("%d/%m/%Y at %I:%M%p", "%d/%m/%Y at %H:%M")
+        # match = TimeFormat.TIME_RELATIVE_REGEX.match(time)
+        for fmt in formats:
+            try:
+                dt = datetime.datetime.strptime(time, fmt)
+                dt.replace(microsecond=0, tzinfo=datetime.timezone.utc)
+                return dt
+            except ValueError:
+                continue
+
+    @staticmethod
+    def format_relative(dt: datetime.datetime) -> str:
+        return dt.strftime("%d/%m/%Y at %I:%M%p")
 
 
 def parse_time(time: str) -> int:
     """Parses a timespan (e.g. 1d, 3 hours) into seconds"""
-    time = time.strip()
-    matches = tuple(TIME_REGEX.finditer(time))
-    if len(matches) == 0:
-        raise ValueError("Invalid time format")
-
-    total_seconds = 0
-    for match in matches:
-        length = int(match.group("len"))
-        span = match.group("span").lower()[0]
-        total_seconds += length * TIMESPANS[span]
-
-    return total_seconds
+    return TimeFormat.parse_relative(time)
 
 
 @discord.utils.deprecated("get_guild_config")
@@ -234,8 +266,21 @@ async def create_error(context: typing.Union[commands.Context, discord.Applicati
     }
     if isinstance(context, discord.ApplicationContext):
         kwargs["command"] = context.command.qualified_name
-        types = {1: CommandType.SLASH, 2: CommandType.USER, 3: CommandType.MESSAGE}
-        kwargs["command_type"] = types[context.interaction.data["type"]]
+        types = {
+            1: CommandType.SLASH,
+            2: CommandType.USER,
+            3: CommandType.MESSAGE,
+            4: CommandType.AUTOCOMPLETE,
+            5: CommandType.MODAL,
+        }
+        # class InteractionType(Enum):
+        # ping = 1
+        # application_command = 2
+        # component = 3
+        # auto_complete = 4
+        # modal_submit = 5
+        # noinspection PyUnresolvedReferences
+        kwargs["command_type"] = types[context.interaction.type.value]
     else:
         kwargs["command_type"] = cmd_type
 
@@ -263,3 +308,10 @@ class MaxConcurrency:
 def load_colon_int_list(raw: str) -> List[int]:
     results = [int(x) for x in raw.split(":") if x]
     return results
+
+
+def avatar(user: typing.Union[discord.User, discord.Member], *, display: bool = True) -> discord.Asset:
+    """Finds the user's current avatar."""
+    if display:
+        return user.display_avatar
+    return user.avatar or user.default_avatar

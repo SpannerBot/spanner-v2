@@ -328,8 +328,8 @@ class Bot(commands.Bot):
                 original_message = await context.interaction.original_message()
                 ephemeral = original_message.flags.ephemeral
 
-            if os.getenv("ERROR_CHANNEL"):
-                error_channel_id = os.getenv("ERROR_CHANNEL")
+            if self.get_config_value("ERROR_CHANNEL"):
+                error_channel_id = self.get_config_value("ERROR_CHANNEL")
                 if not error_channel_id.isdigit():
                     warnings.warn(UserWarning("The environment variable 'ERROR_CHANNEL' is not an integer."))
 

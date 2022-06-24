@@ -614,15 +614,9 @@ class Moderation(commands.Cog):
             description="The case ID you want to edit.",
             autocomplete=discord.utils.basic_autocomplete(case_id_autocomplete),
         ),
-        new_reason: discord.Option(
-            str,
-            description="The new reason for this case.",
-            required=False,
-            default=...,
-        ),
     ):
         """Edits the details of a case."""
-        await ctx.defer(ephemeral=True)
+        # await ctx.defer(ephemeral=True)
         case_id = re.match(r"\(#(\d+)\)", case_id).group(1)
         guild = await utils.get_guild_config(ctx.guild)
         try:
@@ -634,25 +628,63 @@ class Moderation(commands.Cog):
             if not ctx.author.guild_permissions.administrator:
                 return await ctx.respond("You must be an administrator to manage other people's cases.", ephemeral=True)
 
-        changes = []
+        class ReasonModal(discord.ui.Modal):
+            def __init__(self, cog: Moderation):
+                self.cog = cog
+                super().__init__(
+                    discord.ui.InputText(
+                        style=discord.InputTextStyle.paragraph,
+                        custom_id="reason",
+                        label="Reason",
+                        value=case.reason,
+                        min_length=1,
+                        max_length=4000,
+                        placeholder="The reason behind this case",
+                    ),
+                    title=f"Edit case #{case.id}",
+                )
+                # if case.expire_at is not None:
+                #     self.add_item(
+                #         discord.ui.InputText(
+                #             label="Expires at",
+                #             custom_id="expire_at",
+                #             value=utils.TimeFormat.format_relative(case.expire_at),
+                #             placeholder="dd/mm/yyyy at HH:MMam/pm",
+                #             required=False,
+                #             max_length=len(utils.TimeFormat.format_relative(case.expire_at)),
+                #         )
+                #     )
 
-        if new_reason is not ...:
-            await case.update(reason=new_reason)
-            changes.append("reason")
+            async def callback(self, interaction: discord.Interaction):
+                await interaction.response.defer(ephemeral=True)
+                changes = []
+                for child in self.children:
+                    if child.value != getattr(case, child.custom_id):
+                        try:
+                            await case.update(**{child.custom_id: child.value})
+                        except Exception as err:
+                            (lambda: err)()
+                            changes.append("(failed) " + child.custom_id)
+                        else:
+                            changes.append(child.custom_id)
 
-        if len(changes) != 0:
-            await self.log_event(
-                guild,
-                embed=discord.Embed(
-                    title=f"\N{MEMO}"
-                    f"{ctx.author} edited case #{case.id} ({case.type.name.replace('_', '-').title()}) by "
-                    f"{await self.bot.get_or_fetch_user(case.moderator)}.",
-                    description=f"Changes: {', '.join(changes)}",
-                    colour=discord.Colour.orange(),
-                    timestamp=discord.utils.utcnow(),
-                ),
-            )
-            return await ctx.respond("\N{white heavy check mark} Changes saved.", ephemeral=True)
+                if len(changes) != 0:
+                    await self.cog.log_event(
+                        guild,
+                        embed=discord.Embed(
+                            title=f"\N{MEMO}"
+                            f"{ctx.author} edited case #{case.id} ({case.type.name.replace('_', '-').title()}) by "
+                            f"{await self.cog.bot.get_or_fetch_user(case.moderator)}.",
+                            description=f"Changes: {', '.join(changes)}",
+                            colour=discord.Colour.orange(),
+                            timestamp=discord.utils.utcnow(),
+                        ),
+                    )
+                    return await interaction.followup.send(
+                        content="\N{white heavy check mark} Changes saved.", ephemeral=True
+                    )
+
+        return await ctx.send_modal(ReasonModal(self))
 
     cases_list = cases_group.create_subgroup("list", "List cases matching a criteria")
 

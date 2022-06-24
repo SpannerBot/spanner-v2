@@ -833,12 +833,12 @@ class Info(commands.Cog):
                 e = discord.Embed(
                     title=f"{emoji.name}'s info:",
                     description=f"**Name:** {emoji.name}\n"
-                                f"**ID:** {emoji.id}\n"
-                                f"**Created:** {discord.utils.format_dt(emoji.created_at, 'R')}\n"
-                                f"**Format:** `{str(emoji)}`\n"
-                                f"**Animated?:** {utils.Emojis.bool(emoji.animated)}\n"
-                                f"**Custom?:** {utils.Emojis.bool(emoji.is_custom_emoji())}\n"
-                                f"**URL:** {self.hyperlink(emoji.url)}\n",
+                    f"**ID:** {emoji.id}\n"
+                    f"**Created:** {discord.utils.format_dt(emoji.created_at, 'R')}\n"
+                    f"**Format:** `{str(emoji)}`\n"
+                    f"**Animated?:** {utils.Emojis.bool(emoji.animated)}\n"
+                    f"**Custom?:** {utils.Emojis.bool(emoji.is_custom_emoji())}\n"
+                    f"**URL:** {self.hyperlink(emoji.url)}\n",
                     color=discord.Colour.orange(),
                     timestamp=emoji.created_at,
                 )
@@ -852,10 +852,7 @@ class Info(commands.Cog):
                 e.set_image(url=str(emoji.url))
                 embeds.append(e)
 
-        paginator = pages.Paginator(
-            embeds,
-            disable_on_timeout=True
-        )
+        paginator = pages.Paginator(embeds, disable_on_timeout=True)
         await paginator.respond(ctx.interaction, ephemeral=True)
 
 

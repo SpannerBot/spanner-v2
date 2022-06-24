@@ -1,6 +1,4 @@
 # Source: https://raw.githubusercontent.com/jmoiron/humanize/master/src/humanize/filesize.py
-#!/usr/bin/env python
-
 """Bits and bytes related humanization."""
 
 suffixes = {
