@@ -1,3 +1,3 @@
-from .utils import *
-from . import converters, views, errors
+from . import converters, views
 from .trace_resources import Tracer
+from .utils import *

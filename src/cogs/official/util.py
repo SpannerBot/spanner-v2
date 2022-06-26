@@ -327,7 +327,7 @@ class Utility(commands.Cog):
                 for uid in top_authors
             )
         )
-        return await ctx.respond(value, embed=None)
+        return await ctx.respond(value, ephemeral=True)
 
     @commands.message_command(name="Delete before this")
     @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
@@ -370,7 +370,7 @@ class Utility(commands.Cog):
             await asyncio.wait_for(modal.wait(), timeout=120)
         except asyncio.TimeoutError:
             return
-        await ctx.defer()
+        await ctx.defer(ephemeral=True)
         messages = await ctx.channel.purge(
             limit=max_messages,
             check=lambda _m: (_m.pinned is False) if ignore_pins else True,
@@ -391,7 +391,7 @@ class Utility(commands.Cog):
                 for uid in top_authors
             )
         )
-        return await ctx.respond(value, embed=None)
+        return await ctx.respond(value, ephemeral=True)
 
     @commands.slash_command(name="simple-poll")
     async def simple_poll(

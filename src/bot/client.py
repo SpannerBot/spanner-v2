@@ -313,6 +313,7 @@ class Bot(commands.Bot):
             commands.BotMissingPermissions: "I do not have permission to run this command.\n'{e!s}'",
             commands.CommandOnCooldown: "This command is on cooldown.\n'{e!s}'",
             commands.MaxConcurrencyReached: "This command is currently running too many times.\n'{e!s}'",
+            commands.DisabledCommand: "{e!s}",
         }
         if isinstance(exception, tuple(static_errors.keys())):
             await context.respond(static_errors[type(exception)].format(ctx=context, e=exception), ephemeral=True)
@@ -330,7 +331,7 @@ class Bot(commands.Bot):
 
             if self.get_config_value("ERROR_CHANNEL"):
                 error_channel_id = self.get_config_value("ERROR_CHANNEL")
-                if not error_channel_id.isdigit():
+                if isinstance(error_channel_id, str) and not error_channel_id.isdigit():
                     warnings.warn(UserWarning("The environment variable 'ERROR_CHANNEL' is not an integer."))
 
                 error_channel_id = int(error_channel_id)

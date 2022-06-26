@@ -7,6 +7,12 @@ from src.database.models import WelcomeMessage
 from src.utils import get_guild_config, utils, views
 
 
+async def is_owner(ctx: discord.ApplicationContext) -> bool:
+    if not await ctx.bot.is_owner(ctx.author):
+        return False
+    return True
+
+
 class ConfigCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -59,17 +65,27 @@ class ConfigCog(commands.Cog):
         else:
             return await ctx.respond("Removed your log channel.")
 
+    @config.command(name="toggle-vote-kick")
+    @commands.has_permissions(kick_members=True)
+    @commands.bot_has_permissions(kick_members=True)
+    @utils.disable_with_reason(reason="Command is not ready yet.")
+    async def toggle_vote_kick(self, ctx: discord.ApplicationContext, enable: bool = None):
+        """Toggles the vote kick command on or off"""
+
     welcome_message = config.create_subgroup("welcome-message", "Manages your welcome message settings")
 
     @commands.message_command(name="set-message")
+    @discord.default_permissions(manage_guild=True)
+    @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
     async def set_message(self, ctx: discord.ApplicationContext, message: discord.Message):
-        await ctx.defer(invisible=True)
+        await ctx.defer()
         guild = await utils.get_guild_config(ctx.guild)
-        _message, _ = await WelcomeMessage.objects.get_or_create(guild=guild)
+        _message, _ = await WelcomeMessage.objects.get_or_create(guild=guild, defaults={})
         await _message.update(message=message.content)
         return await ctx.respond("\N{white heavy check mark}")
 
     @welcome_message.command(name="set-embed")
+    @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
     async def welcome_set_embed(self, ctx: discord.ApplicationContext):
         """Sets the welcome message embed that is sent when someone joins your server."""
 
@@ -135,6 +151,7 @@ class ConfigCog(commands.Cog):
         await ctx.send_modal(EmbedModal())
 
     @welcome_message.command(name="ignore-bots")
+    @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
     async def welcome_ignore_bots(
         self,
         ctx: discord.ApplicationContext,
@@ -145,11 +162,12 @@ class ConfigCog(commands.Cog):
         """Sets if the welcome messages should ignore new bots"""
         await ctx.defer()
         guild = await utils.get_guild_config(ctx.guild)
-        message, _ = await WelcomeMessage.objects.get_or_create(guild=guild)
+        message, _ = await WelcomeMessage.objects.get_or_create(guild=guild, defaults={})
         await message.update(ignore_bots=ignore_bots)
         return await ctx.respond("\N{white heavy check mark} Will%signore bots" % ("" if ignore_bots else " not "))
 
     @welcome_message.command(name="delete-message-after")
+    @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
     async def welcome_delete_after(
         self,
         ctx: discord.ApplicationContext,

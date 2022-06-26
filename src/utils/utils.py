@@ -6,7 +6,7 @@ import traceback
 import typing
 import warnings
 from functools import partial
-from typing import Any, Callable, List, Optional, Iterable
+from typing import Any, Callable, List, Optional, Iterable, Coroutine
 
 import discord
 import httpx
@@ -315,3 +315,28 @@ def avatar(user: typing.Union[discord.User, discord.Member], *, display: bool = 
     if display:
         return user.display_avatar
     return user.avatar or user.default_avatar
+
+
+def disable_with_reason(
+    condition: Optional[Callable[[discord.ApplicationContext], typing.Union[bool, Coroutine[Any, Any, bool]]]] = None,
+    *,
+    reason: str = None,
+):
+    """Disables a command with a reason, unless the condition provided is met."""
+
+    async def predicate(ctx: discord.ApplicationContext):
+        if condition is not None:
+            try:
+                okay = await discord.utils.maybe_coroutine(condition, ctx)
+            except commands.CheckFailure:
+                okay = False
+
+            if okay is not True:
+                raise commands.DisabledCommand(f"This command is disabled: {reason}")
+
+        else:
+            raise commands.DisabledCommand(f"This command is disabled: {reason}")
+
+        return True
+
+    return commands.check(predicate)

@@ -3,6 +3,7 @@ import platform
 import re
 import subprocess
 import sys
+import textwrap
 import time
 from io import BytesIO
 from textwrap import shorten
@@ -206,6 +207,11 @@ class Info(commands.Cog):
         return values
 
     @staticmethod
+    def first_line(text: str, max_length: int = 100, placeholder: str = "...") -> str:
+        line = text.splitlines(False)[0]
+        return textwrap.shorten(line, max_length, placeholder=placeholder)
+
+    @staticmethod
     def hyperlink(url: str, text: str = ...):
         if text is ...:
             parsed = urlparse(url)
@@ -242,6 +248,7 @@ class Info(commands.Cog):
         return content, embed, file
 
     @commands.slash_command()
+    @commands.bot_has_permissions(embed_links=True, attach_files=True)
     async def avatar(self, ctx: discord.ApplicationContext, user: discord.User):
         """Shows you someone's avatar."""
         await ctx.defer()
@@ -271,6 +278,11 @@ class Info(commands.Cog):
                 files.append(file)
 
             return await ctx.respond(None, embeds=embeds, files=files)
+
+    @commands.user_command(name="Avatar")
+    @commands.bot_has_permissions(embed_links=True, attach_files=True)
+    async def get_user_avatar(self, ctx: discord.ApplicationContext, user: discord.User):
+        return await self.avatar(ctx, user)
 
     @commands.slash_command(name="user-info")
     async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
@@ -493,7 +505,16 @@ class Info(commands.Cog):
                 colour=discord.Colour.dark_grey(),
             )
         else:
-            return await ctx.respond("Unknown channel type.")
+            # noinspection PyUnresolvedReferences
+            return await ctx.respond(
+                "It doesn't look like I support this channel type yet!\n"
+                "Recently discord has added a whole host of new channel types since this command was written"
+                ". Currently, the only supported channel types are text, voice (and stage), and categories.\n"
+                "If another type of channel works, not all information will be available, and some may be missing."
+                " Updating this command is a low priority, so you may have to wait a while for support for the channel"
+                f" type of {channel.type.name.replace('_', ' ').title()!r} to be supported.\n"
+                f"Join the support server "
+            )
 
         embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
@@ -534,9 +555,84 @@ class Info(commands.Cog):
         )
         if message.content:
             embed.add_field(name="Message Content:", value=content, inline=False)
+
+        if message.reference is not None:
+            resolved = message.reference.resolved
+            if resolved is None:
+                try:
+                    channel = self.bot.get_channel(message.reference.channel_id)
+                    resolved = await channel.fetch_message(message.reference.message_id)
+                except discord.HTTPException:
+                    pass
+            if resolved is not None and not isinstance(resolved, discord.DeletedReferencedMessage):
+                embed.add_field(
+                    name="In reply to:",
+                    value=f"[Message from {resolved.author.mention}]({message.jump_url})",
+                    inline=False,
+                )
+        elif message.interaction is not None:
+            embed.add_field(
+                name=f"In response to:",
+                value=f"Command {message.interaction.name!r} from {message.interaction.user.mention} for "
+                      f"{message.author.mention}",
+                inline=False,
+            )
+
         embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
+
+        embeds = [embed]
+        for embed in message.embeds:
+            if embed.type == "rich":
+                fields = []
+                if embed.author:
+                    fields.append(
+                        f"**Author**:\n"
+                        f"\\* Name: {textwrap.shorten(embed.author.name or '*Blank*', 100, placeholder='...')}\n"
+                        f"\\* URL: {self.hyperlink(embed.author.url) if embed.author.url else '*Blank*'}"
+                    )
+                if embed.title:
+                    fields.append(f"**Title**:\n> {textwrap.shorten(embed.title, 1000, placeholder='...')}")
+                if embed.description:
+                    fields.append(f"**Description**:\n> {self.first_line(embed.description, 2000)}")
+                if embed.thumbnail.url is not discord.Embed.Empty:
+                    fields.append(
+                        f"**Thumbnail URL**: {self.hyperlink(embed.thumbnail.url)} "
+                        f"{self.hyperlink(embed.thumbnail.proxy_url, text='(proxy)')}"
+                    )
+                fields.append(f"**Colour**: {embed.colour or discord.Colour.default()}")
+                if embed.fields:
+                    fields.append(f"**Fields**: {len(embed.fields)}/25")
+                if embed.footer is not discord.Embed.Empty:
+                    shortened_text = textwrap.shorten(
+                        discord.utils.escape_markdown(embed.footer.text or "*Blank*"), 100, placeholder="..."
+                    )
+                    fields.append(
+                        f"**Footer**:\n"
+                        f"\\* Text: {shortened_text}\n"
+                        f"\\* Icon: {self.hyperlink(embed.footer.icon_url) if embed.footer.icon_url else '*Blank*'}"
+                    )
+                if embed.timestamp:
+                    fields.append(f"**Timestamp**: {discord.utils.format_dt(embed.timestamp, 'F')}")
+                if embed.image:
+                    fields.append(
+                        f"**Image URL**: "
+                        f"{self.hyperlink(embed.image.url)} {self.hyperlink(embed.image.proxy_url, '(proxy)')}"
+                    )
+                fields.append(f"**Total size**: {len(embed):,}/6,000 characters")
+
+                for n, field in enumerate(fields):
+                    fields[n] = field.replace("\u200b", "[ZWSP]")
+
+                embeds.append(
+                    discord.Embed(
+                        title=f"Information on embed #{len(embeds)}:",
+                        description="\n".join(fields),
+                        colour=embed.colour or discord.Colour.default()
+                    )
+                )
+
         return await ctx.respond(
-            embed=embed, ephemeral=ctx.channel.permissions_for(ctx.guild.default_role).send_messages is False
+            embeds=embeds[:10], ephemeral=ctx.channel.permissions_for(ctx.guild.default_role).send_messages is False
         )
 
     @commands.slash_command(name="role-info")
@@ -759,8 +855,9 @@ class Info(commands.Cog):
             color=discord.Color.blurple(),
             timestamp=ctx.guild.created_at,
         )
-        embed.set_thumbnail(url=ctx.guild.icon.url)
-        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.avatar.url)
+        if ctx.guild.icon:
+            embed.set_thumbnail(url=ctx.guild.icon.url)
+        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         if ctx.guild.description is not None:
             embed.add_field(name="Guild Description", value=ctx.guild.description)
         return await ctx.respond(embed=embed)
@@ -852,8 +949,11 @@ class Info(commands.Cog):
                 e.set_image(url=str(emoji.url))
                 embeds.append(e)
 
-        paginator = pages.Paginator(embeds, disable_on_timeout=True)
-        await paginator.respond(ctx.interaction, ephemeral=True)
+        if embeds:
+            paginator = pages.Paginator(embeds, disable_on_timeout=True)
+            await paginator.respond(ctx.interaction, ephemeral=True)
+        else:
+            return await ctx.respond("No emojis found.")
 
 
 def setup(bot):
