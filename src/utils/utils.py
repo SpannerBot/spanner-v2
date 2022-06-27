@@ -30,6 +30,8 @@ __all__ = (
     "load_colon_int_list",
     "TimeFormat",
     "avatar",
+    "disable_with_reason",
+    "disable_unless_owner",
 )
 
 case_type_names = {
@@ -340,3 +342,10 @@ def disable_with_reason(
         return True
 
     return commands.check(predicate)
+
+
+def disable_unless_owner(reason: str = "Command is under development."):
+    async def is_owner(c: discord.ApplicationContext) -> bool:
+        return await c.bot.is_owner(c.author)
+
+    return disable_with_reason(is_owner, reason=reason)

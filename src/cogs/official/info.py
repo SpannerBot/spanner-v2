@@ -574,7 +574,7 @@ class Info(commands.Cog):
             embed.add_field(
                 name=f"In response to:",
                 value=f"Command {message.interaction.name!r} from {message.interaction.user.mention} for "
-                      f"{message.author.mention}",
+                f"{message.author.mention}",
                 inline=False,
             )
 
@@ -627,7 +627,7 @@ class Info(commands.Cog):
                     discord.Embed(
                         title=f"Information on embed #{len(embeds)}:",
                         description="\n".join(fields),
-                        colour=embed.colour or discord.Colour.default()
+                        colour=embed.colour or discord.Colour.default(),
                     )
                 )
 

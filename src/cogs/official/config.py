@@ -74,15 +74,15 @@ class ConfigCog(commands.Cog):
 
     welcome_message = config.create_subgroup("welcome-message", "Manages your welcome message settings")
 
-    @commands.message_command(name="set-message")
-    @discord.default_permissions(manage_guild=True)
-    @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
-    async def set_message(self, ctx: discord.ApplicationContext, message: discord.Message):
-        await ctx.defer()
-        guild = await utils.get_guild_config(ctx.guild)
-        _message, _ = await WelcomeMessage.objects.get_or_create(guild=guild, defaults={})
-        await _message.update(message=message.content)
-        return await ctx.respond("\N{white heavy check mark}")
+    # @commands.message_command(name="set-message")
+    # @discord.default_permissions(manage_guild=True)
+    # @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
+    # async def set_message(self, ctx: discord.ApplicationContext, message: discord.Message):
+    #     await ctx.defer()
+    #     guild = await utils.get_guild_config(ctx.guild)
+    #     _message, _ = await WelcomeMessage.objects.get_or_create(guild=guild, defaults={})
+    #     await _message.update(message=message.content)
+    #     return await ctx.respond("\N{white heavy check mark}")
 
     @welcome_message.command(name="set-embed")
     @utils.disable_with_reason(is_owner, reason="Command not ready yet.")
