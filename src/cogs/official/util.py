@@ -441,8 +441,17 @@ class Utility(commands.Cog):
     @embed_command.command(name="create")
     @commands.bot_has_permissions(embed_links=True)
     # @utils.disable_unless_owner()
-    async def create_embed(self, ctx: discord.ApplicationContext):
+    async def create_embed(
+        self,
+        ctx: discord.ApplicationContext,
+        use_guide: discord.Option(
+            bool, description="If true, will use a pre-filled embed with example values.", default=True
+        ),
+    ):
+        """Guides you through creating an embed."""
         view = EmbedCreatorView(ctx)
+        if use_guide is False:
+            view.embed = discord.Embed(description="Edit this with the buttons below.")
         await ctx.respond(embed=view.embed, view=view)
 
     @commands.message_command(name="Edit Embed")
