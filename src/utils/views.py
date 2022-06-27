@@ -1002,11 +1002,11 @@ class EmbedCreatorFieldManagerFieldEditor(AutoDisableView):
                 min_length=1,
                 value={True: "y", False: "n"}[self.selected_field[1].inline],
             ),
-            title="Create new field",
+            title="Edit field",
         )
         modal.callback = EmbedCreatorView.simple_modal_callback(modal)
         if not await EmbedCreatorView.send_modal(interaction, modal):
-            await self.parent.edit(content="Field was not added (timed out)")
+            await self.parent.edit(content="Field was not edited (timed out)")
         else:
             inline = modal.children[-1].value[0].lower() == "y"
             size = len(modal.children[0].value) + len(modal.children[1].value)
@@ -1016,7 +1016,13 @@ class EmbedCreatorFieldManagerFieldEditor(AutoDisableView):
                     f" remaining, field was {size:,} characters)"
                 )
             else:
-                self.parent.embed.add_field(name=modal.children[0].value, value=modal.children[1].value, inline=inline)
+                self.parent.embed.remove_field(self.selected_field[0])
+                self.parent.embed.insert_field_at(
+                    index=self.selected_field[0],
+                    name=modal.children[0].value,
+                    value=modal.children[1].value,
+                    inline=inline,
+                )
                 await self.parent.edit(
                     content=f"Added field #{len(self.parent.embed.fields)}.", embed=self.parent.embed
                 )
