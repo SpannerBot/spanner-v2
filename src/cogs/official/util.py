@@ -16,7 +16,7 @@ from orm import NoMatch
 from src import utils
 from src.bot.client import Bot
 from src.database import SimplePoll
-from src.utils.views import SimplePollView
+from src.utils.views import SimplePollView, EmbedCreatorView, AutoDisableView
 from src.vendor.humanize.size import naturalsize
 
 logger = logging.getLogger(__name__)
@@ -435,6 +435,61 @@ class Utility(commands.Cog):
         await entry.update(message=message.id, channel_id=message.channel.id)
         self.bot.add_view(view, message_id=message.id)
         await ctx.respond(f"[Poll created.]({message.jump_url})", ephemeral=True)
+
+    embed_command = discord.SlashCommandGroup("embed", description="Embed management")
+
+    @embed_command.command(name="create")
+    @commands.bot_has_permissions(embed_links=True)
+    # @utils.disable_unless_owner()
+    async def create_embed(self, ctx: discord.ApplicationContext):
+        view = EmbedCreatorView(ctx)
+        await ctx.respond(embed=view.embed, view=view)
+
+    @commands.message_command(name="Edit Embed")
+    @discord.default_permissions(send_messages=True, embed_links=True, manage_messages=True)
+    @commands.bot_has_permissions(embed_links=True)
+    async def edit_embed(self, ctx: discord.ApplicationContext, message: discord.Message):
+        embeds = list(filter(lambda e: e.type == "rich", message.embeds))
+        if len(embeds) == 0:
+            return await ctx.respond("No embeds found.")
+        if len(embeds) > 1:
+            class EmbedSelector(AutoDisableView):
+                class Btn(discord.ui.Button):
+                    def __init__(self, n: int, is_rich: bool):
+                        super().__init__(
+                            label=f"Embed {n+1}",
+                            disabled=not is_rich,
+                            custom_id=str(n),
+                            emoji="%d\U0000fe0f\U000020e3" % (n+1)
+                        )
+
+                    async def callback(self, interaction: discord.Interaction):
+                        await EmbedCreatorView.defer_invisible(interaction)
+                        self.view.chosen = int(self.custom_id)
+                        self.view.stop()
+
+                def __init__(self):
+                    super().__init__()
+                    self.chosen = None
+                    for embed in message.embeds:
+                        self.add_item(
+                            self.Btn(
+                                message.embeds.index(embed),
+                                embed.type == "rich"
+                            )
+                        )
+            _view = EmbedSelector()
+            await ctx.respond("Select an embed to edit:", view=_view)
+            await _view.wait()
+            if _view.chosen is not None:
+                chosen_embed = message.embeds[_view.chosen]
+                await ctx.delete(delay=0.2)
+            else:
+                return await ctx.delete(delay=0.1)
+        else:
+            chosen_embed = embeds[0]
+        view = EmbedCreatorView(ctx, chosen_embed)
+        return await ctx.respond(embed=chosen_embed, view=view)
 
 
 def setup(bot):
