@@ -827,7 +827,12 @@ class EmbedCreatorFieldManager(AutoDisableView):
                 custom_id="name", label="Field title:", placeholder="Required", min_length=1, max_length=256
             ),
             discord.ui.InputText(
-                custom_id="value", label="Content:", placeholder="Required", min_length=1, max_length=1024
+                custom_id="value",
+                label="Content:",
+                placeholder="Required",
+                min_length=1,
+                max_length=1024,
+                style=discord.InputTextStyle.long,
             ),
             discord.ui.InputText(
                 custom_id="inline",
@@ -963,6 +968,7 @@ class EmbedCreatorFieldManagerFieldEditor(AutoDisableView):
         value = int(self.select.values[0])
         self.selected_field = value, self.parent.embed.fields[value]
         self.enable_all_items()
+        self.remove_item(self.select)
         await interaction.edit_original_message(view=self)
 
     @button(label="Edit", emoji="\N{pencil}", custom_id="edit", disabled=True)
@@ -986,6 +992,7 @@ class EmbedCreatorFieldManagerFieldEditor(AutoDisableView):
                 min_length=1,
                 max_length=1024,
                 value=self.selected_field[1].value,
+                style=discord.InputTextStyle.long,
             ),
             discord.ui.InputText(
                 custom_id="inline",
@@ -1036,7 +1043,8 @@ class EmbedCreatorFieldManagerFieldRemover(AutoDisableView):
 
     async def callback(self, interaction: discord.Interaction):
         await EmbedCreatorView.defer_invisible(interaction)
-        for field in self.parent.embed.fields:
+        copy = self.parent.embed.fields.copy()
+        for field in copy:
             if str(hash(field.name) + hash(field.value)) in self.select.values:
                 self.parent.embed.remove_field(self.parent.embed.fields.index(field))
         self.enable_all_items()
