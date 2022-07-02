@@ -680,28 +680,37 @@ class Info(commands.Cog):
             invite_matches = await unfurl_invite_url(invite)
         except httpx.HTTPError as e:
             return await ctx.respond(str(e) + ".", ephemeral=True)
-        self.bot.console.log(invite_matches)
-        if all(v is not None for v in invite_matches) and invite_matches[0] == "bot":
-            self.bot.console.log()
-            client_id = int(invite_matches[1].group("client_id").split("=")[-1])
+        except (KeyError, ValueError, TypeError):
             try:
-                user: discord.User = await self.bot.get_or_fetch_user(client_id)
-            except discord.HTTPException as e:
-                return await ctx.respond(f"Failed to resolve invite data: {e}", ephemeral=True)
+                # noinspection PyTypeChecker
+                converted = await commands.InviteConverter().convert(ctx, invite)
+            except commands.BadInviteArgument as e:
+                return await ctx.respond(str(e) + ".", ephemeral=True)
             else:
-                embed = discord.Embed(
-                    title=f"Invite - {user}",
-                    description=f"Run `/user-info user:{user.id}` to get this bot's information.",
-                )
-                embed.set_thumbnail(url=user.display_avatar.url)
-                return await ctx.respond(embed=embed, ephemeral=True)
+                invite: discord.Invite = converted
+        else:
+            self.bot.console.log(invite_matches)
+            if all(v is not None for v in invite_matches) and invite_matches[0] == "bot":
+                self.bot.console.log()
+                client_id = int(invite_matches[1].group("client_id").split("=")[-1])
+                try:
+                    user: discord.User = await self.bot.get_or_fetch_user(client_id)
+                except discord.HTTPException as e:
+                    return await ctx.respond(f"Failed to resolve invite data: {e}", ephemeral=True)
+                else:
+                    embed = discord.Embed(
+                        title=f"Invite - {user}",
+                        description=f"Run `/user-info user:{user.id}` to get this bot's information.",
+                    )
+                    embed.set_thumbnail(url=user.display_avatar.url)
+                    return await ctx.respond(embed=embed, ephemeral=True)
 
-        invite: str = invite_matches[-1].group("url") if invite_matches[-1] else invite
+            invite: str = invite_matches[-1].group("url") if invite_matches[-1] == "server" else invite
 
-        try:
-            invite: discord.Invite = await self.bot.fetch_invite(invite)
-        except discord.HTTPException:
-            return await ctx.respond("Invalid Invite Code.", ephemeral=True)
+            try:
+                invite: discord.Invite = await self.bot.fetch_invite(invite)
+            except discord.HTTPException:
+                return await ctx.respond("Invalid Invite Code.", ephemeral=True)
 
         if invite.expires_at:
             expires_at = discord.utils.format_dt(invite.expires_at, "R")
@@ -744,6 +753,7 @@ class Info(commands.Cog):
             f"**Verification Level**: {invite.guild.verification_level.name} "
             f"({verification_levels[invite.guild.verification_level]})",
             f"**Member Count**: {member_count}",
+            f"**Invite Channel**: <#{invite.channel.id}> ({getattr(invite.channel, 'name', 'unknown-channel')!r})"
         ]
 
         embed = discord.Embed(
