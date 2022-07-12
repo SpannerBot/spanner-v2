@@ -278,6 +278,14 @@ def make_setup():
 
 
 @cli.command()
+@click.option(
+    "--dir",
+    "-D",
+    default=None,
+    type=Path,
+    help="The working directory to run the bot in. If not provided, automatically found.",
+    name="directory",
+)
 def run():
     """Starts the bot"""
     from src import launcher
@@ -289,6 +297,16 @@ def run():
         asyncio.run(launcher.launch())
     finally:
         click.echo("Bot process finished.")
+
+
+@cli.command(name="update")
+def update_bot():
+    """Runs pipx upgrade."""
+    try:
+        subprocess.run(("pipx", "upgrade", "-e", "spanner"))
+    except FileNotFoundError:
+        click.echo("PipX does not appear to be on PATH. Unable to update.")
+        click.echo("Please run `pipx upgrade -e spanner'.")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ import textwrap
 import time
 from io import BytesIO
 from textwrap import shorten
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, List
 from urllib.parse import urlparse
 
 import bs4
@@ -55,7 +55,7 @@ nsfw_levels = {
 async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None, None]]:
     from src.bot.client import bot
 
-    bot.console.log(f"(UNFURLER) Preparing to unfurl {url}")
+    # bot.console.log(f"(UNFURLER) Preparing to unfurl {url}")
     # Dear maintainers,
     # This dictionary is designed to fully automate and streamline the gathering of scraped data.
     # If it has to have its own function, define it in a lambda. If you cannot do that, the service cannot be used.
@@ -115,52 +115,52 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
         return "server", _invite.url
 
     for entry in regexes:
-        bot.console.log(f"(UNFURLER) Testing {entry['domain']}")
+        # bot.console.log(f"(UNFURLER) Testing {entry['domain']}")
         if entry["domain"].match(url):
-            bot.console.log(f"(UNFURLER) MATCH ON DOMAIN {entry['domain']!s} - {url!r}")
+            # bot.console.log(f"(UNFURLER) MATCH ON DOMAIN {entry['domain']!s} - {url!r}")
             trusted_statuses = entry.get("trust_status", None)
             if trusted_statuses is not None:
-                bot.console.log(f"(UNFURLER) {url!r} has trusted statuses: {trusted_statuses}")
+                # bot.console.log(f"(UNFURLER) {url!r} has trusted statuses: {trusted_statuses}")
                 try:
                     bot.console.log(f"(UNFURLER) HEAD {url!r}")
                     head: httpx.Response = await utils.session.head(url)
                 except httpx.HTTPError:
                     raise
                 else:
-                    bot.console.log(f"(UNFURLER) {url!r} returned response code {head.status_code} for HEAD")
+                    # bot.console.log(f"(UNFURLER) {url!r} returned response code {head.status_code} for HEAD")
                     if head.status_code in trusted_statuses and head.headers.get("Location") is not None:
                         location = qualify(head.headers["Location"])
-                        bot.console.log(f"(UNFURLER) {url!r} response code is valid and has a LOC header - {location}")
+                        # bot.console.log(f"(UNFURLER) {url!r} response code is valid and has a LOC header - {location}")
                         for invite_type, invite_regex in entry["invites"].items():
-                            bot.console.log(f"(UNFURLER) {location!r} - matching against {invite_regex}")
+                            # bot.console.log(f"(UNFURLER) {location!r} - matching against {invite_regex}")
                             if _m := invite_regex.match(location):
-                                bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
+                                # bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
                                 return invite_type, _m
 
             try:
-                bot.console.log(f"(UNFURLER) GET {url!r}")
+                # bot.console.log(f"(UNFURLER) GET {url!r}")
                 get: httpx.Response = await utils.session.get(url)
-                bot.console.log(f"(UNFURLER) {url!r} returned {get.status_code}")
+                # bot.console.log(f"(UNFURLER) {url!r} returned {get.status_code}")
                 get.raise_for_status()
             except httpx.HTTPError:
                 raise
             else:
                 soup = await utils.run_blocking(BeautifulSoup, get.text, features="html.parser")
-                bot.console.log(f"(UNFURLER) {url!r} parsed successfully")
+                # bot.console.log(f"(UNFURLER) {url!r} parsed successfully")
                 # noinspection PyTypeChecker
                 for tag_name in entry["query_tags"]["names"]:
-                    bot.console.log(f"(UNFURLER) Looking for following tags in parsed content: {tag_name!r}")
+                    # bot.console.log(f"(UNFURLER) Looking for following tags in parsed content: {tag_name!r}")
                     found_tags = soup.html.find_all(tag_name)
-                    bot.console.log(f"(UNFURLER) Found {len(found_tags):,} tags in parsed content!")
+                    # bot.console.log(f"(UNFURLER) Found {len(found_tags):,} tags in parsed content!")
                     for tag in found_tags[: entry["query_tags"]["max_search"]]:
                         tag: bs4.Tag
                         for invite_type, invite_regex in entry["invites"].items():
                             location = tag.get_text(strip=True)
                             if _m := invite_regex.match(location):
-                                bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
+                                # bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
                                 return invite_type, _m
 
-    bot.console.log(f"(UNFURLER) No matches :(")
+    # bot.console.log(f"(UNFURLER) No matches :(")
     return None, None
 
 
@@ -168,7 +168,7 @@ class Info(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot: Bot = bot
 
-    def get_user_data(self, user: Union[discord.User, discord.Member], guild: discord.Guild = None):
+    def get_user_data(self, user: Union[discord.User, discord.Member], guild: discord.Guild = None) -> List[str]:
         # noinspection PyUnresolvedReferences
         values = [
             f"**ID**: `{user.id}`",
@@ -205,6 +205,108 @@ class Info(commands.Cog):
 
         values = list(filter(lambda x: x is not None, values))  # remove guild-only shit
         return values
+
+    async def get_server_data(
+        self, ctx: Union[discord.ApplicationContext, commands.Context], guild: discord.Guild = None
+    ) -> discord.Embed:
+        guild = guild or ctx.guild
+        filter_level_name = content_filter_names[guild.explicit_content_filter]
+        filter_level_description = content_filters[guild.explicit_content_filter]
+        system_channel_flags = []
+        if guild.system_channel:
+            _flag_items = {
+                "join_notifications": "Random join message",
+                "premium_subscriptions": "Boost message",
+                "guild_reminder_notifications": "'Helpful' server setup tips",
+                "join_notification_replies": "'Wave to [user]' on join messages",
+            }
+            for flag, name in _flag_items.items():
+                if getattr(guild.system_channel_flags, flag) is True:
+                    system_channel_flags.append(name)
+
+        if guild.me.guild_permissions.manage_guild:
+            invites = len(await guild.invites())
+        else:
+            invites = "Missing 'manage server' permission."
+
+        if guild.me.guild_permissions.manage_webhooks:
+            webhooks = len(await guild.webhooks())
+        else:
+            webhooks = "Missing 'manage webhooks' permission."
+
+        if guild.me.guild_permissions.ban_members:
+            bans = f"{len(await guild.bans().flatten()):,}"
+        else:
+            bans = "Missing 'ban members' permission."
+
+        discovery_splash = "No discovery splash"
+        if guild.discovery_splash:
+            discovery_splash = self.hyperlink(guild.discovery_splash.url)
+
+        if guild.owner is None:
+            await guild.query_members(user_ids=[guild.owner_id], cache=True)
+
+        # noinspection PyUnresolvedReferences
+        values = [
+            f"**ID**: `{guild.id}`",
+            f"**Name**: {discord.utils.escape_markdown(guild.name)}",
+            f"**Icon URL**: {self.hyperlink(guild.icon.url)}" if guild.icon else None,
+            f"**Banner URL**: {self.hyperlink(guild.banner.url)}" if guild.banner else None,
+            f"**Splash URL**: {self.hyperlink(guild.splash.url)}" if guild.splash else None,
+            f"**Discovery Splash URL**: {discovery_splash}",
+            f"**Owner**: {guild.owner.mention}",
+            f"**Created**: {discord.utils.format_dt(guild.created_at, 'R')}",
+            f"**Locale**: {guild.preferred_locale}",
+            f"**NSFW Level**: {nsfw_levels[guild.nsfw_level]}",
+            f"**Emojis**: {len(guild.emojis)}",
+            f"**Stickers**: {len(guild.stickers)}",
+            f"**Roles**: {len(guild.roles)}",
+            f"**Members**: {guild.member_count:,}",
+            f"**VC AFK Timeout**: {utils.format_time(guild.afk_timeout)}",
+            f"**AFK Channel**: {guild.afk_channel.mention if guild.afk_channel else 'None'}",
+            f"**Moderation requires 2fa?** {utils.Emojis.bool(guild.mfa_level > 0)}",
+            f"**Verification Level**: {guild.verification_level.name} "
+            f"({verification_levels[guild.verification_level]})",
+            f"**Content Filter**: {filter_level_name} ({filter_level_description})",
+            f"**Default Notifications**: {guild.default_notifications.name.title().replace('_', ' ')}",
+            f"**Features**: {', '.join(str(x).title().replace('_', ' ') for x in guild.features)}",
+            f"**Boost Level**: {guild.premium_tier}",
+            f"**Boost Count**: {guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
+            f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(guild.premium_progress_bar_enabled)}",
+            f"**Invites**: {invites}",
+            f"**Webhooks**: {webhooks}",
+            f"**Bans**: {bans}",
+            f"**Categories**: {len(guild.categories)}",
+            f"**Text Channels**: {len(guild.text_channels)}",
+            f"**Voice Channels**: {len(guild.voice_channels)}",
+            f"**Stage Channels**: {len(guild.stage_channels)}",
+            f"**Approximate Thread Count**: {len(guild.threads):,}",
+            f"**Rules Channel**: {guild.rules_channel.mention if guild.rules_channel else 'None'}",
+            f"**System Messages Channel**: {guild.system_channel.mention if guild.system_channel else 'None'}",
+            f"**System Messages Settings**: {', '.join(system_channel_flags) if system_channel_flags else 'None'}",
+            f"**Emoji Limit**: {guild.emoji_limit:,}",
+            f"**Sticker Limit**: {guild.sticker_limit:,}",
+            f"**Max VC bitrate**: {guild.bitrate_limit/1000:.1f}kbps",
+            f"**Max Upload Size**: {guild.filesize_limit/1024/1024:.1f}MB",
+            f"**Max Members**: {guild.max_members or 500000:,}",
+            f"**Max Online Members**: {guild.max_presences or guild.max_members or 500000:,}",
+            f"**Max Video Channel Users**: {guild.max_video_channel_users}",
+            f"**Scheduled Events**: {len(guild.scheduled_events)}",
+        ]
+        values = list(filter(lambda x: x is not None, values))
+        embed = discord.Embed(
+            title=f"{guild.name} ({guild.id})",
+            description="\n".join(values),
+            color=discord.Color.blurple(),
+            timestamp=guild.created_at,
+        )
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+        if guild.description is not None:
+            embed.add_field(name="Guild Description", value=guild.description)
+
+        return embed
 
     @staticmethod
     def first_line(text: str, max_length: int = 100, placeholder: str = "...") -> str:
@@ -671,7 +773,7 @@ class Info(commands.Cog):
 
     @commands.slash_command(name="invite-info")
     async def invite_info(self, ctx: discord.ApplicationContext, *, invite: str):
-        """Gives you information about a    provided invite"""
+        """Gives you information about a provided invite"""
         # NOTE: All responses for this command must be ephemeral due to the sensitive nature.
         # For example, automods may punish users or users may misuse the command to advertise.
         await ctx.defer(ephemeral=True)
@@ -753,7 +855,7 @@ class Info(commands.Cog):
             f"**Verification Level**: {invite.guild.verification_level.name} "
             f"({verification_levels[invite.guild.verification_level]})",
             f"**Member Count**: {member_count}",
-            f"**Invite Channel**: <#{invite.channel.id}> ({getattr(invite.channel, 'name', 'unknown-channel')!r})"
+            f"**Invite Channel**: <#{invite.channel.id}> ({getattr(invite.channel, 'name', 'unknown-channel')!r})",
         ]
 
         embed = discord.Embed(
@@ -774,103 +876,25 @@ class Info(commands.Cog):
             return await ctx.respond("This command can only be used in a server.")
 
         await ctx.defer()
-
-        filter_level_name = content_filter_names[ctx.guild.explicit_content_filter]
-        filter_level_description = content_filters[ctx.guild.explicit_content_filter]
-        system_channel_flags = []
-        if ctx.guild.system_channel:
-            _flag_items = {
-                "join_notifications": "Random join message",
-                "premium_subscriptions": "Boost message",
-                "guild_reminder_notifications": "'Helpful' server setup tips",
-                "join_notification_replies": "'Wave to [user]' on join messages",
-            }
-            for flag, name in _flag_items.items():
-                if getattr(ctx.guild.system_channel_flags, flag) is True:
-                    system_channel_flags.append(name)
-
-        if ctx.guild.me.guild_permissions.manage_guild:
-            invites = len(await ctx.guild.invites())
-        else:
-            invites = "Missing 'manage server' permission."
-
-        if ctx.guild.me.guild_permissions.manage_webhooks:
-            webhooks = len(await ctx.guild.webhooks())
-        else:
-            webhooks = "Missing 'manage webhooks' permission."
-
-        if ctx.guild.me.guild_permissions.ban_members:
-            bans = f"{len(await ctx.guild.bans().flatten()):,}"
-        else:
-            bans = "Missing 'ban members' permission."
-
-        discovery_splash = "No discovery splash"
-        if ctx.guild.discovery_splash:
-            discovery_splash = self.hyperlink(ctx.guild.discovery_splash.url)
-
-        if ctx.guild.owner is None:
-            await ctx.guild.query_members(user_ids=[ctx.guild.owner_id], cache=True)
-
-        # noinspection PyUnresolvedReferences
-        values = [
-            f"**ID**: `{ctx.guild.id}`",
-            f"**Name**: {discord.utils.escape_markdown(ctx.guild.name)}",
-            f"**Icon URL**: {self.hyperlink(ctx.guild.icon.url)}" if ctx.guild.icon else None,
-            f"**Banner URL**: {self.hyperlink(ctx.guild.banner.url)}" if ctx.guild.banner else None,
-            f"**Splash URL**: {self.hyperlink(ctx.guild.splash.url)}" if ctx.guild.splash else None,
-            f"**Discovery Splash URL**: {discovery_splash}",
-            f"**Owner**: {ctx.guild.owner.mention}",
-            f"**Created**: {discord.utils.format_dt(ctx.guild.created_at, 'R')}",
-            f"**Locale**: {ctx.guild.preferred_locale}",
-            f"**NSFW Level**: {nsfw_levels[ctx.guild.nsfw_level]}",
-            f"**Emojis**: {len(ctx.guild.emojis)}",
-            f"**Stickers**: {len(ctx.guild.stickers)}",
-            f"**Roles**: {len(ctx.guild.roles)}",
-            f"**Members**: {ctx.guild.member_count:,}",
-            f"**VC AFK Timeout**: {utils.format_time(ctx.guild.afk_timeout)}",
-            f"**AFK Channel**: {ctx.guild.afk_channel.mention if ctx.guild.afk_channel else 'None'}",
-            f"**Moderation requires 2fa?** {utils.Emojis.bool(ctx.guild.mfa_level > 0)}",
-            f"**Verification Level**: {ctx.guild.verification_level.name} "
-            f"({verification_levels[ctx.guild.verification_level]})",
-            f"**Content Filter**: {filter_level_name} ({filter_level_description})",
-            f"**Default Notifications**: {ctx.guild.default_notifications.name.title().replace('_', ' ')}",
-            f"**Features**: {', '.join(str(x).title().replace('_', ' ') for x in ctx.guild.features)}",
-            f"**Boost Level**: {ctx.guild.premium_tier}",
-            f"**Boost Count**: {ctx.guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
-            f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(ctx.guild.premium_progress_bar_enabled)}",
-            f"**Invites**: {invites}",
-            f"**Webhooks**: {webhooks}",
-            f"**Bans**: {bans}",
-            f"**Categories**: {len(ctx.guild.categories)}",
-            f"**Text Channels**: {len(ctx.guild.text_channels)}",
-            f"**Voice Channels**: {len(ctx.guild.voice_channels)}",
-            f"**Stage Channels**: {len(ctx.guild.stage_channels)}",
-            f"**Approximate Thread Count**: {len(ctx.guild.threads):,}",
-            f"**Rules Channel**: {ctx.guild.rules_channel.mention if ctx.guild.rules_channel else 'None'}",
-            f"**System Messages Channel**: {ctx.guild.system_channel.mention if ctx.guild.system_channel else 'None'}",
-            f"**System Messages Settings**: {', '.join(system_channel_flags) if system_channel_flags else 'None'}",
-            f"**Emoji Limit**: {ctx.guild.emoji_limit:,}",
-            f"**Sticker Limit**: {ctx.guild.sticker_limit:,}",
-            f"**Max VC bitrate**: {ctx.guild.bitrate_limit/1000:.1f}kbps",
-            f"**Max Upload Size**: {ctx.guild.filesize_limit/1024/1024:.1f}MB",
-            f"**Max Members**: {ctx.guild.max_members or 500000:,}",
-            f"**Max Online Members**: {ctx.guild.max_presences or ctx.guild.max_members or 500000:,}",
-            f"**Max Video Channel Users**: {ctx.guild.max_video_channel_users}",
-            f"**Scheduled Events**: {len(ctx.guild.scheduled_events)}",
-        ]
-        values = list(filter(lambda x: x is not None, values))
-        embed = discord.Embed(
-            title=f"{ctx.guild.name} ({ctx.guild.id})",
-            description="\n".join(values),
-            color=discord.Color.blurple(),
-            timestamp=ctx.guild.created_at,
-        )
-        if ctx.guild.icon:
-            embed.set_thumbnail(url=ctx.guild.icon.url)
-        embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
-        if ctx.guild.description is not None:
-            embed.add_field(name="Guild Description", value=ctx.guild.description)
+        embed = await self.get_server_data(ctx)
         return await ctx.respond(embed=embed)
+
+    @commands.command(name="server-info")
+    @commands.is_owner()
+    @commands.guild_only()
+    async def server_info_text_command(self, ctx: commands.Context, *, guild: str = None):
+        """Shows information about a server"""
+        if guild is None:
+            guild = ctx.guild
+        else:
+            for g in self.bot.guilds:
+                if guild.lower() in g.name.lower() or str(g.id) == guild:
+                    guild = g
+                    break
+
+        async with ctx.typing():
+            embed = await self.get_server_data(ctx, guild)
+        return await ctx.reply(embed=embed)
 
     @commands.slash_command(name="emoji-info")
     async def emoji_info(self, ctx: discord.ApplicationContext, emoji: str):
