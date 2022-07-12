@@ -278,14 +278,6 @@ def make_setup():
 
 
 @cli.command()
-@click.option(
-    "--dir",
-    "-D",
-    default=None,
-    type=Path,
-    help="The working directory to run the bot in. If not provided, automatically found.",
-    name="directory",
-)
 def run():
     """Starts the bot"""
     from src import launcher
