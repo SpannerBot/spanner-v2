@@ -59,6 +59,11 @@ class AutoDisableView(View):
         await super().on_error(error, item, interaction)
 
 
+class TenMinuteTimeoutModal(discord.ui.Modal):
+    def __init__(self, *children, title: str, custom_id: str = None, timeout: float = 600.0):
+        super().__init__(*children, title=title, custom_id=custom_id, timeout=timeout)
+
+
 class YesNoPrompt(AutoDisableView):
     confirm: bool = False
 
@@ -377,7 +382,7 @@ class EmbedCreatorView(AutoDisableView):
             new_title = modal.children[0].value or discord.Embed.Empty
             modal.stop()
 
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Title:",
                 placeholder="Empty for no title",
@@ -404,7 +409,7 @@ class EmbedCreatorView(AutoDisableView):
             new_description = modal.children[0].value or discord.Embed.Empty
             modal.stop()
 
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 style=discord.InputTextStyle.long,
                 label="Description:",
@@ -437,7 +442,7 @@ class EmbedCreatorView(AutoDisableView):
 
     @button(label="Change url")
     async def change_url(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(label="url", required=False, value=self.embed.author.url or None),
             title="Change url",
         )
@@ -461,7 +466,7 @@ class EmbedCreatorView(AutoDisableView):
 
     @button(label="Set thumbnail (small image)")
     async def modify_thumbnail_url(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Image URL (blank for none):",
                 placeholder="Must be one of: PNG, JP(E)G, WEBP, GIF",
@@ -490,7 +495,7 @@ class EmbedCreatorView(AutoDisableView):
 
     @button(label="Set image (large image)")
     async def modify_image_url(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Image URL (blank for none):",
                 placeholder="Must be one of: PNG, JP(E)G, WEBP, GIF",
@@ -620,7 +625,7 @@ class EmbedCreatorColourPickerView(AutoDisableView):
 
     @button(label="Custom (Hex)", emoji="\N{PENCIL}", style=discord.ButtonStyle.primary)
     async def custom_hex(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Colour (#hex):",
                 placeholder=str(self.chosen) if self.chosen else "#FFFFFF",
@@ -658,7 +663,7 @@ class EmbedCreatorAuthorEditor(AutoDisableView):
 
     @button(label="Change text")
     async def change_text(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Author text", required=False, max_length=256, value=self.parent.embed.author.name or None
             ),
@@ -682,7 +687,7 @@ class EmbedCreatorAuthorEditor(AutoDisableView):
 
     @button(label="Change url")
     async def change_url(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(label="Author url", required=False, value=self.parent.embed.author.url or None),
             title="Change author url",
         )
@@ -711,7 +716,7 @@ class EmbedCreatorAuthorEditor(AutoDisableView):
 
     @button(label="Change icon url")
     async def change_icon_url(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Author icon url", required=False, value=self.parent.embed.author.icon_url or None
             ),
@@ -749,7 +754,7 @@ class EmbedCreatorFooterEditor(AutoDisableView):
 
     @button(label="Change text")
     async def change_text(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="Footer text", required=False, max_length=2048, value=self.parent.embed.footer.text or None
             ),
@@ -771,7 +776,7 @@ class EmbedCreatorFooterEditor(AutoDisableView):
 
     @button(label="Change icon url")
     async def change_icon_url(self, _, interaction: discord.Interaction):
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 label="footer icon url", required=False, value=self.parent.embed.footer.icon_url or None
             ),
@@ -822,7 +827,7 @@ class EmbedCreatorFieldManager(AutoDisableView):
         remaining = len(self.parent.embed)
         if remaining < 2:
             return await interaction.followup.send("Embed is full.")
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 custom_id="name", label="Field title:", placeholder="Required", min_length=1, max_length=256
             ),
@@ -976,7 +981,7 @@ class EmbedCreatorFieldManagerFieldEditor(AutoDisableView):
         remaining = len(self.parent.embed)
         if remaining < 2:
             return await interaction.followup.send("Embed is full.")
-        modal = discord.ui.Modal(
+        modal = TenMinuteTimeoutModal(
             discord.ui.InputText(
                 custom_id="name",
                 label="Field title:",
