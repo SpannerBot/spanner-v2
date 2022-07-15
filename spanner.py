@@ -33,11 +33,6 @@ def get_file_tree(directory: Path = None, tree: Tree = None) -> Tree:
     return tree
 
 
-@click.command()
-def main():
-    click.echo("Error: `spanner` is deprecated. You should use `spanner-cli`.")
-
-
 @click.group()
 def cli():
     pass
@@ -63,16 +58,28 @@ def version(verbose: bool = False):
     spanner_version = subprocess.run(
         ("git", "rev-parse", "--short", "HEAD"), capture_output=True, encoding=sys.stdout.encoding
     )
-    spanner_version = spanner_version.stdout.strip()
+    spanner_version = spanner_version.stdout.strip() or 'unknown'
     spanner_version = (
         discord.utils.find(lambda item: item["name"] == "spanner", packages_data) or {"version": spanner_version}
     )["version"]
+
+    configs = []
+    # In order of lookup:
+    if Path("./config.json").exists():
+        configs.append(("Local", Path("./config.json").absolute()))
+    if Path("~/.config/spanner-v2/config.json").exists():
+        configs.append(("Global", Path("~/.config/spanner-v2/config.json").absolute()))
+    if Path("./.env").exists():
+        configs.append(("Local-Old\N{WARNING SIGN}", Path("./.env").absolute()))
 
     lines = [
         "py-cord version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(discord.version_info),
         "Python version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(sys.version_info),
         "\t- Executable: " + sys.executable,
-        "\t- Local Config: %s" % Path("./config.json").absolute(),
+        *[
+            "\t- %s Config: %s" % (name, path)
+            for name, path in configs
+        ],
         "Spanner version: " + spanner_version,
         "System: " + platform.platform(),
     ]
@@ -100,7 +107,12 @@ def convert_config():
     with open("./.env") as old_file:
         for line in old_file.readlines():
             line = line.strip()
-            name, value = line.split("=", 1)
+            try:
+                name, value = line.split("=", 1)
+            except ValueError as e:
+                print("Failed to process line:", repr(line), "-", e)
+                print("Skipping")
+                continue
             name: str = name.lower()
             if ":" in value:
                 try:
@@ -302,4 +314,4 @@ def update_bot():
 
 
 if __name__ == "__main__":
-    main()
+    cli()

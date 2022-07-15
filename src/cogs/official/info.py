@@ -91,7 +91,7 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
             "query_tags": {
                 # backup
                 "names": ("a",),
-                "max_search": 1,  # there's only one A tag there
+                "max_search": 3,  # there's only one A tag there
             },
         },
     )
@@ -115,52 +115,37 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
         return "server", _invite.url
 
     for entry in regexes:
-        # bot.console.log(f"(UNFURLER) Testing {entry['domain']}")
         if entry["domain"].match(url):
-            # bot.console.log(f"(UNFURLER) MATCH ON DOMAIN {entry['domain']!s} - {url!r}")
             trusted_statuses = entry.get("trust_status", None)
             if trusted_statuses is not None:
-                # bot.console.log(f"(UNFURLER) {url!r} has trusted statuses: {trusted_statuses}")
                 try:
                     bot.console.log(f"(UNFURLER) HEAD {url!r}")
                     head: httpx.Response = await utils.session.head(url)
                 except httpx.HTTPError:
                     raise
                 else:
-                    # bot.console.log(f"(UNFURLER) {url!r} returned response code {head.status_code} for HEAD")
                     if head.status_code in trusted_statuses and head.headers.get("Location") is not None:
                         location = qualify(head.headers["Location"])
-                        # bot.console.log(f"(UNFURLER) {url!r} response code is valid and has a LOC header - {location}")
                         for invite_type, invite_regex in entry["invites"].items():
-                            # bot.console.log(f"(UNFURLER) {location!r} - matching against {invite_regex}")
                             if _m := invite_regex.match(location):
-                                # bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
                                 return invite_type, _m
 
             try:
-                # bot.console.log(f"(UNFURLER) GET {url!r}")
                 get: httpx.Response = await utils.session.get(url)
-                # bot.console.log(f"(UNFURLER) {url!r} returned {get.status_code}")
                 get.raise_for_status()
             except httpx.HTTPError:
                 raise
             else:
                 soup = await utils.run_blocking(BeautifulSoup, get.text, features="html.parser")
-                # bot.console.log(f"(UNFURLER) {url!r} parsed successfully")
                 # noinspection PyTypeChecker
                 for tag_name in entry["query_tags"]["names"]:
-                    # bot.console.log(f"(UNFURLER) Looking for following tags in parsed content: {tag_name!r}")
                     found_tags = soup.html.find_all(tag_name)
-                    # bot.console.log(f"(UNFURLER) Found {len(found_tags):,} tags in parsed content!")
                     for tag in found_tags[: entry["query_tags"]["max_search"]]:
                         tag: bs4.Tag
                         for invite_type, invite_regex in entry["invites"].items():
                             location = tag.get_text(strip=True)
                             if _m := invite_regex.match(location):
-                                # bot.console.log(f"(UNFURLER) Found match for {invite_regex!s} - {location!r}")
                                 return invite_type, _m
-
-    # bot.console.log(f"(UNFURLER) No matches :(")
     return None, None
 
 

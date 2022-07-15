@@ -4,7 +4,7 @@
 ### Simple
 1. Run
 ```sh
-$ pip install --editable git+https://github.com/EEKIM10/spanner-v2.git
+$ pipx install git+https://github.com/EEKIM10/spanner-v2.git
 ```
 2. run `python -m spanner setup` and set everything up
 3. run `python -m spanner run` to start the bot!
@@ -19,7 +19,7 @@ $ pip install --editable git+https://github.com/EEKIM10/spanner-v2.git
 OR without using pip install
 
 3. create your config.json file
-4. run `python . run`
+4. run `python src run`
 
 ## Important change as of 11/06/2022
 Configuration is now held in a config.json file, as we outgrew .env files.

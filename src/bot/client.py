@@ -230,7 +230,7 @@ class Bot(commands.Bot):
         self.console.log("Bot is logged in to discord!")
         logger.info("Logged in to discord as %s." % self.user)
         self.console.log(
-            "User: [link=%r]%s[/]"
+            "User: [link=%s]%s[/]"
             % (
                 discord.utils.oauth_url(self.user.id, scopes="bot+applications.commands"),
                 self.user,

@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="launcher" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+  <configuration default="false" name="spanner" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
     <module name="spanner-v2" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
@@ -21,8 +21,8 @@
         <ENTRY IS_ENABLED="true" PARSER="runconfig" />
       </ENTRIES>
     </EXTENSION>
-    <option name="SCRIPT_NAME" value="C:\Users\Nexus\PycharmProjects\spanner-v2\src\launcher.py" />
-    <option name="PARAMETERS" value="--enforce-cwd" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/spanner.py" />
+    <option name="PARAMETERS" value="" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="true" />
     <option name="MODULE_MODE" value="false" />

@@ -15,7 +15,7 @@ from discord.webhook.async_ import async_context
 
 from src.database import SimplePoll
 
-__all__ = ("YesNoPrompt", "SimplePollViewSeeResultsViewVotersView", "SimplePollView")
+__all__ = ("YesNoPrompt", "SimplePollView", "StealEmojiView", "EmbedCreatorView")
 
 
 class AutoDisableView(View):
