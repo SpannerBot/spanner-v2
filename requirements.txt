@@ -16,3 +16,4 @@ aiofiles==0.8.0
 beautifulsoup4==4.11.1
 setproctitle==1.2.3
 validators==0.20.0
+cronitor==4.5.0

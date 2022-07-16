@@ -20,6 +20,8 @@ async def main(bot):
 
         if bot.get_config_value("fancy_tracebacks"):
             install(console=bot.console, show_locals=True)
+
+        bot.console.log("Starting connections...")
         await bot.launch()
     except (Exception, TypeError):  # two errors to shut the linter up about catching Exception itself
         bot.console.print("[red bold]Critical Exception!")
@@ -37,17 +39,18 @@ async def main(bot):
 
 async def launch():
     from src.bot.client import bot as bot_instance
+    bot_instance.console.log("Preparing to launch spanner...")
 
     if Path("~/.local").exists():
         log_path = Path("~/.local/share/spanner-v2/spanner.log")
         log_path.mkdir(parents=True, exist_ok=True)
     else:
         log_path = Path("spanner.log")
-    bot_instance.console.log("Log is located at [link file://%s]%s" % (log_path.absolute(), log_path))
+    bot_instance.console.log("Log is located at %s." % (log_path.absolute()))
 
     logging.basicConfig(
         filename=log_path,
-        level=bot_instance.get_config_value("log_level"),
+        level=bot_instance.get_config_value("log_level") or logging.INFO,
         filemode="a",
         format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
         datefmt="%d-%m-%Y %H:%M:%S",
@@ -56,6 +59,7 @@ async def launch():
     )
     try:
         setproctitle("spanner")
+        bot_instance.console.log("Handing off launcher...")
         await main(bot_instance)
     except (Exception, AttributeError):
         try:

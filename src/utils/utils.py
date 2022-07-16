@@ -269,6 +269,7 @@ async def create_error(context: typing.Union[commands.Context, discord.Applicati
     if isinstance(context, discord.ApplicationContext):
         kwargs["command"] = context.command.qualified_name
         types = {
+            0: CommandType.UNKNOWN,
             1: CommandType.SLASH,
             2: CommandType.USER,
             3: CommandType.MESSAGE,
@@ -282,7 +283,7 @@ async def create_error(context: typing.Union[commands.Context, discord.Applicati
         # auto_complete = 4
         # modal_submit = 5
         # noinspection PyUnresolvedReferences
-        kwargs["command_type"] = types[context.interaction.type.value]
+        kwargs["command_type"] = types.get(context.interaction.type.value, CommandType.UNKNOWN)
     else:
         kwargs["command_type"] = cmd_type
 

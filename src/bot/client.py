@@ -2,12 +2,13 @@ import asyncio
 import json
 import logging
 import os
+import platform
 import random
 import textwrap
 import traceback
 import warnings
 from pathlib import Path
-from typing import List, Optional, Dict, Type, Union, TYPE_CHECKING
+from typing import List, Optional, Dict, Type, Union, TYPE_CHECKING, Any
 
 import discord
 import httpx
@@ -32,7 +33,10 @@ class Bot(commands.Bot):
         config: Optional[Dict[str, Union[str, int, float, dict, list, bool, type(None)]]]
 
     def __init__(self):
+        self.errors = 0
         self.console = Console()
+        self.console.log("Instance initialised")
+        self.cronitor = None
         if os.getenv("COLOURS", "True").lower() == "false":
             self.console.log = self.console.print
         self.home = Path(__file__).parents[1]  # /src directory.
@@ -63,6 +67,11 @@ class Bot(commands.Bot):
                 db_model.database = Database(DatabaseURL("sqlite://" + str(cfg_dir / "spanner-v2" / "main.db")))
                 self.console.log("database is now located at: %s" % str(cfg_dir / "spanner-v2" / "main.db"))
 
+        if capi := self.get_config_value("CRONITOR_API_KEY") is not None:
+            from cronitor import Monitor
+            self.cronitor = Monitor(self.get_config_value("CRONITOR_TELEMETRY_NAME") or "Spanner-Bot", capi)
+            self.cronitor.ping(state="run", hostname=platform.node())
+
         super().__init__(
             command_prefix=utils.get_prefix,
             description="eek's personal helper, re-written! | source code: https://github.com/EEKIM10/spanner-v2",
@@ -91,6 +100,18 @@ class Bot(commands.Bot):
             self.console.log("Owner IDs: %s" % ", ".join(str(x) for x in self.owner_ids))
         if self.debug is not False and guild_ids is not None:
             self.console.log("Debug Guild IDs: %s" % ", ".join(str(x) for x in guild_ids))
+
+    async def ping_cronitor(self, message: str = None):
+        if self.cronitor is None:
+            return
+        await utils.run_blocking(
+            self.cronitor.ping,
+            message=message,
+            metrics={
+                "error_count": self.errors
+            },
+            hostname=platform.node()
+        )
 
     def get_config_value(self, *names: str) -> Union[str, int, float, dict, list, bool, type(None)]:
         """Fetches a config value.
@@ -222,12 +243,12 @@ class Bot(commands.Bot):
         await super().register_command(command, force, guild_ids)
 
     async def on_connect(self):
-        self.console.log("Connected to discord!")
+        self.console.log("Connected to discord.")
         await super().on_connect()
 
     async def on_ready(self):
         self.last_logged_in = discord.utils.utcnow()
-        self.console.log("Bot is logged in to discord!")
+        self.console.log("Spanner is ready to operate.")
         logger.info("Logged in to discord as %s." % self.user)
         self.console.log(
             "User: [link=%s]%s[/]"
@@ -281,6 +302,10 @@ class Bot(commands.Bot):
             await context.reply(help_text, delete_after=30)
             return
         await super().on_command_error(context, exception)
+
+    async def on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:
+        self.errors += 1
+        await super().on_error(event_method, *args, **kwargs)
 
     @staticmethod
     async def find_invite(channel: discord.abc.GuildChannel, *, infinite: bool = False) -> Optional[discord.Invite]:
