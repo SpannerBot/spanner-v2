@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Union, List
 
 import discord
+import httpx
 import orm
 from discord.ext import bridge
 from discord.ext import commands, pages as pagination
@@ -137,7 +138,7 @@ class Debug(commands.Cog):
         self,
         ctx: discord.ApplicationContext,
         case_id: discord.Option(
-            int, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)
+            str, "The ID of the case", autocomplete=discord.utils.basic_autocomplete(get_similar_case_ids)
         ),
         ephemeral: discord.Option(bool, "Whether to send the error message as an ephemeral message", default=False),
     ):
@@ -163,8 +164,14 @@ class Debug(commands.Cog):
 
             full_message = "unavailable"
             if case.full_message is not None:
-                async with utils.session.post("https://h.nexy7574.cyou/documents", data=case.full_message) as response:
-                    full_message = "[available here](https://h.nexy7574.cyou/" + response.json()["key"] + ")"
+                try:
+                    async with utils.session.post(
+                            "https://h.nexy7574.cyou/documents",
+                            data=case.full_message
+                    ) as response:
+                        full_message = "[available here](https://h.nexy7574.cyou/" + response.json()["key"] + ")"
+                except httpx.HTTPError:
+                    pass
 
             traceback_text = "```py\n{}\n```".format(case.traceback_text)
             if len(traceback_text) > 2000:
