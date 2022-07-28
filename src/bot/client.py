@@ -17,12 +17,10 @@ from discord.ext import commands
 from rich.console import Console
 
 from src.utils import utils
-from ..database import *
 from ..database.models import models as db_model
 
 __all__ = ("Bot", "bot")
 
-from ..utils.views import SimplePollView
 
 INTENTS = discord.Intents.default()
 logger = logging.getLogger(__name__)
@@ -45,8 +43,8 @@ class Bot(commands.Bot):
                 loaded = json.load(config_file)
                 self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
                 logger.debug("Loaded config.json")
-        elif Path("~/.config/spanner-v2/config.json").exists():
-            with Path("~/.config/spanner-v2/config.json").open() as config_file:
+        elif Path("~/.config/spanner-v2/config.json").expanduser().exists():
+            with Path("~/.config/spanner-v2/config.json").expanduser().open() as config_file:
                 loaded = json.load(config_file)
                 self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
                 logger.debug("Loaded config.json from global config")
@@ -392,10 +390,6 @@ class Bot(commands.Bot):
             await super().on_application_command_error(context, exception)
 
     async def start(self, token: str, *, reconnect: bool = True) -> None:
-        for poll in await SimplePoll.objects.all():
-            self.console.log("Registering poll %s to permanent view" % poll.id)
-            view = SimplePollView(poll.id, None)
-            self.add_view(view, message_id=poll.message)
         self.console.log("Waiting for network...")
         await self.wait_for_network()
         self.console.log("Network ready!")

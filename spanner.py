@@ -71,8 +71,8 @@ def version(verbose: bool = False):
     # In order of lookup:
     if Path("./config.json").exists():
         configs.append(("Local", Path("./config.json").absolute()))
-    if Path("~/.config/spanner-v2/config.json").exists():
-        configs.append(("Global", Path("~/.config/spanner-v2/config.json").absolute()))
+    if Path("~/.config/spanner-v2/config.json").expanduser().exists():
+        configs.append(("Global", Path("~/.config/spanner-v2/config.json").expanduser().absolute()))
     if Path("./.env").exists():
         configs.append(("Local-Old\N{WARNING SIGN}", Path("./.env").absolute()))
 
