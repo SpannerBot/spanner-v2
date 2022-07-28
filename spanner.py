@@ -53,7 +53,11 @@ def version(verbose: bool = False):
     output = subprocess.run(
         (sys.executable, "-m", "pip", "list", "--format=json"), capture_output=True, encoding=sys.stdout.encoding
     )
-    packages_data = json.loads(output.stdout.strip())
+    try:
+        packages_data = json.loads(output.stdout.strip())
+    except json.JSONDecodeError as e:
+        packages_data = []
+        print("Failed to load package data:", e)
 
     spanner_version = subprocess.run(
         ("git", "rev-parse", "--short", "HEAD"), capture_output=True, encoding=sys.stdout.encoding
