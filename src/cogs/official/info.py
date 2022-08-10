@@ -393,11 +393,12 @@ class Info(commands.Cog):
                     capture_output=True,
                     encoding="utf-8",
                 )
-                if "not found" in proc.stdout or not proc.stdout.strip():
+                stdout = proc.stdout.strip()
+                if "not found" in stdout or not stdout:
                     # Not installed via pipx. Default to git.
                     raise FileNotFoundError("Not installed via pipx.")
                 try:
-                    data = json.loads(proc.stdout)
+                    data = json.loads(stdout)
                 except json.JSONDecodeError:
                     spanner_version = "error (invalid version output)"
                 else:
@@ -408,14 +409,20 @@ class Info(commands.Cog):
                     spanner_version_match = re.match(r"(\d\.\d\.\d)(a|b|rc|f)(\w+)", spanner_version_raw["version"])
                     try:
                         spanner_version = spanner_version_match.group(3)
-                        latest_version = await utils.session.get("https://github.com/repos/EEKIM10/spanner-v2/commits")
-                        latest_version = latest_version.json()[0]["sha"][: len(spanner_version)]
-                        if latest_version != spanner_version:
-                            update = latest_version
                     except IndexError:
                         spanner_version = spanner_version_match.group()
                     except AttributeError:
                         spanner_version = "unknown-pipx"  # no match
+
+                    try:
+                        latest_version = await utils.session.get("https://github.com/repos/EEKIM10/spanner-v2/commits")
+                        latest_version.raise_for_status()
+                        latest_version = latest_version.json()[0]["sha"][: len(spanner_version)]
+                        if latest_version != spanner_version:
+                            update = latest_version
+                    except (httpx.HTTPStatusError, json.JSONDecodeError, IndexError):
+                        pass
+
             except FileNotFoundError:
                 proc = await utils.run_blocking(
                     subprocess.run, ("git", "rev-parse", "--short", "HEAD"), capture_output=True, encoding="utf-8"
