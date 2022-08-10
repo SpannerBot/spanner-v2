@@ -152,8 +152,8 @@ class Bot(commands.Bot):
     def _select_token(self) -> str:
         # Selects the token that should be used to run.
         # Basically, use the main token when not in debug mode, but look for a dev token before falling back in dev mode
-        primary = self.get_config_value("BOT_TOKEN")
-        old = self.get_config_value("DISCORD_TOKEN")
+        primary = self.get_config_value("BOT_TOKEN", default=...)
+        old = self.get_config_value("DISCORD_TOKEN", default=...)
         if bool(old) is False:
             warnings.warn(
                 DeprecationWarning("The environment variable `DISCORD_TOKEN` is deprecated in favour of `BOT_TOKEN`.")
