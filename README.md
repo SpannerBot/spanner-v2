@@ -10,7 +10,7 @@ $ pip install pipx;pipx install git+https://github.com/EEKIM10/spanner-v2.git
 ### The old way (or development)
 1. clone https://github.com/EEKIM10/spanner-v2.git
 2. cd into it
-3. run `pipx install --editable .`
+3. run `pip install --editable .`
 4. run `python -m spanner setup`
 5. run `python -m spanner run`
 
