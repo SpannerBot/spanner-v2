@@ -466,7 +466,7 @@ class Info(commands.Cog):
                     _mem_info = await utils.run_blocking(process.memory_full_info)
                     ram_used = _mem_info.uss
                     proc_id = process.pid
-                disk_usage = psutil.disk_usage(Path(__file__).drive)
+                disk_usage = psutil.disk_usage(Path(__file__).drive or '/')
 
             embed = discord.Embed(
                 title="My Information:",
