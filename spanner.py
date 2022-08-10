@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import os
 import platform
@@ -291,27 +292,41 @@ def make_setup():
 
 
 @cli.command()
-def run():
+@click.option("--pass-path", is_flag=True, help="Will attempt to grab environment from bash.")
+def run(pass_path: bool = False):
     """Starts the bot"""
+    def get_time():
+        return '[' + datetime.datetime.now().strftime("%X") + ']'
+
+    if pass_path:
+        click.echo(f"{get_time()} Old path: %r" % os.environ["PATH"])
+        p = subprocess.run(
+            ("bash", "-c", "'echo $PATH'"),
+            capture_output=True,
+            encoding="utf-8"
+        )
+        os.environ["PATH"] = p.stdout.strip() or os.environ["PATH"]
+        click.echo(f"{get_time()} New path: %r" % os.environ["PATH"])
+
     from src import launcher
 
-    click.echo("Launching bot...")
+    click.echo(f"{get_time()} Launching bot...")
     os.chdir(Path(launcher.__file__).parents[1])
-    click.echo("Changed working directory to %s." % Path(launcher.__file__).parents[1])
+    click.echo(f"{get_time()} Changed working directory to %s." % Path(launcher.__file__).parents[1])
     try:
         asyncio.run(launcher.launch())
     finally:
-        click.echo("Bot process finished.")
+        click.echo(f"{get_time()} Bot process finished.")
 
 
 @cli.command(name="update")
 def update_bot():
     """Runs pipx upgrade."""
     try:
-        subprocess.run(("pipx", "upgrade", "-e", "spanner"))
+        subprocess.run(("pipx", "upgrade", "spanner"))
     except FileNotFoundError:
         click.echo("PipX does not appear to be on PATH. Unable to update.")
-        click.echo("Please run `pipx upgrade -e spanner'.")
+        click.echo("Please run `pipx upgrade spanner'.")
 
 
 if __name__ == "__main__":
