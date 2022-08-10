@@ -4,10 +4,8 @@
 ### Simple
 1. Run
 ```sh
-$ pipx install git+https://github.com/EEKIM10/spanner-v2.git
+$ pip install pipx;pipx install git+https://github.com/EEKIM10/spanner-v2.git
 ```
-2. run `python -m spanner setup` and set everything up
-3. run `python -m spanner run` to start the bot!
 
 ### The old way (or development)
 1. clone https://github.com/EEKIM10/spanner-v2.git
