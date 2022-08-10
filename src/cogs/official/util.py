@@ -4,19 +4,15 @@ import logging
 import sys
 import textwrap
 from collections import deque
-from datetime import timedelta
 from typing import Dict, List, Literal
 
 import discord
 from discord import SlashCommandGroup
 from discord.commands import Option, permissions
-from discord.ext import commands, pages, tasks
-from orm import NoMatch
+from discord.ext import commands, pages
 
-from src import utils
 from src.bot.client import Bot
-from src.database import SimplePoll
-from src.utils.views import SimplePollView, EmbedCreatorView, AutoDisableView
+from src.utils.views import EmbedCreatorView, AutoDisableView
 from src.vendor.humanize.size import naturalsize
 
 logger = logging.getLogger(__name__)
@@ -32,77 +28,12 @@ class Utility(commands.Cog):
     def cog_unload(self):
         self.poll_expire_loop.cancel()
 
-    @tasks.loop(minutes=1)
-    async def poll_expire_loop(self):
-        # NOTE: This function has very lazy error handling. If you're afraid of that, skip it :D
-        await self.bot.wait_until_ready()
-        now = discord.utils.utcnow().timestamp()
-        for expired_poll in await SimplePoll.objects.filter(ends_at__lte=now, ended=False).all():
-            self.bot.console.log("Expired poll: %s" % expired_poll)
-            channel = self.bot.get_channel(expired_poll.channel_id)
-            if channel is None:
-                # Deleted channel, removed from the server, or we don't have edit permissions
-                await expired_poll.delete()
-
-            try:
-                message = await channel.fetch_message(expired_poll.message)
-            except discord.HTTPException:
-                # Message has been deleted
-                await expired_poll.delete()
-            else:
-                embed = message.embeds[0]
-                embed.description = "This poll has expired. Press `see results` to see the results."
-                embed.colour = discord.Colour.red()
-                view = discord.utils.get(self.bot.persistent_views, poll_id=expired_poll.id)
-                if view:
-                    index = self.bot.persistent_views.index(view)
-                    # noinspection PyUnresolvedReferences
-                    self.bot.persistent_views[index].children[0].disabled = True
-                    # noinspection PyUnresolvedReferences
-                    self.bot.persistent_views[index].children[1].disabled = True
-                    try:
-                        self.bot.console.log("Updating embed and view")
-                        await message.edit(embed=embed, view=self.bot.persistent_views[index])
-                    except discord.HTTPException:
-                        pass
-                    finally:
-                        await expired_poll.update(ended=True)
-                else:
-                    try:
-                        self.bot.console.log("Updating embed")
-                        await message.edit(embed=embed)
-                    except discord.HTTPException:
-                        pass
-                    finally:
-                        await expired_poll.update(ended=True)
-
     @commands.Cog.listener()
     async def on_bulk_message_delete(self, messages: List[discord.Message]):
         logger.debug("Got bulk message delete event with %s messages.", len(messages))
         for message in messages:
             logger.debug("Processing message delete for message %s-%s", message.channel.id, message.id)
             await self.on_message_delete(message)
-
-    @commands.Cog.listener()
-    async def on_raw_message_delete(self, message: discord.RawMessageDeleteEvent):
-        try:
-            entry = await SimplePoll.objects.get(message=message.message_id)
-        except NoMatch:
-            pass
-        else:
-            await entry.delete()
-
-    @commands.Cog.listener()
-    async def on_channel_delete(self, channel: discord.abc.GuildChannel):
-        polls = await SimplePoll.objects.filter(channel_id=channel.id).all()
-        for poll in polls:
-            await poll.delete()
-
-    @commands.Cog.listener()
-    async def on_guild_remove(self, guild: discord.Guild):
-        polls = await SimplePoll.objects.filter(guild_id=guild.id).all()
-        for poll in polls:
-            await poll.delete()
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -392,49 +323,6 @@ class Utility(commands.Cog):
             )
         )
         return await ctx.respond(value, ephemeral=True)
-
-    @commands.slash_command(name="simple-poll")
-    async def simple_poll(
-        self,
-        ctx: discord.ApplicationContext,
-        question: str,
-        duration: discord.Option(str, description="How long until the poll closes.", default="1 day"),
-        post_in: discord.Option(discord.TextChannel, default=None, name="post-in"),
-    ):
-        """Creates a simple yes or no poll."""
-        post_in = post_in or ctx.channel
-        post_in: discord.TextChannel
-        if not post_in.can_send(discord.Embed()):
-            return await ctx.interaction.response.send_message(
-                f"I cannot send a message in {post_in.mention}.", ephemeral=True
-            )
-        try:
-            seconds = utils.parse_time(duration)
-            if seconds > 2635200:
-                return await ctx.respond("Poll duration must be less than a month.", ephemeral=True)
-            elif seconds < 0:
-                return await ctx.respond("How did you get *negative* poll time?", ephemeral=True)
-            poll_closes = discord.utils.utcnow() + timedelta(seconds=seconds)
-        except ValueError:
-            return await ctx.respond("Invalid time format. Try passing something like '30 seconds'.", ephemeral=True)
-
-        # noinspection PyTypeChecker
-        question = await commands.clean_content(fix_channel_mentions=True, use_nicknames=False).convert(ctx, question)
-
-        embed = discord.Embed(
-            title=question[:2048],
-            description=f"Poll closes {discord.utils.format_dt(poll_closes, 'R')}.",
-        )
-        embed.set_author(name="%s asks..." % ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
-        entry = await SimplePoll.objects.create(
-            ends_at=poll_closes.timestamp(), owner=ctx.author.id, guild_id=ctx.guild.id
-        )
-        view = SimplePollView(entry.id, ctx.interaction)
-        embed.set_footer(text="Poll ID: %s" % entry.id)
-        message = await ctx.send(embed=embed, view=view)
-        await entry.update(message=message.id, channel_id=message.channel.id)
-        self.bot.add_view(view, message_id=message.id)
-        await ctx.respond(f"[Poll created.]({message.jump_url})", ephemeral=True)
 
     embed_command = discord.SlashCommandGroup("embed", description="Embed management")
 

@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import os
 import textwrap
 import warnings
@@ -10,12 +9,10 @@ import discord
 import validators
 from discord import ButtonStyle
 from discord.ext import pages, commands
-from discord.ui import View, Button, button
+from discord.ui import View, button
 from discord.webhook.async_ import async_context
 
-from src.database import SimplePoll
-
-__all__ = ("YesNoPrompt", "SimplePollView", "StealEmojiView", "EmbedCreatorView")
+__all__ = ("YesNoPrompt", "StealEmojiView", "EmbedCreatorView")
 
 
 class AutoDisableView(View):
@@ -123,117 +120,6 @@ class SimplePollViewSeeResultsViewVotersView(AutoDisableView):
             self.stop()
         else:
             await interaction.response.send_message("Only administrators can view voters.", ephemeral=True)
-
-
-class SimplePollView(AutoDisableView):
-    def __init__(self, poll_id: int, *args):
-        super().__init__(*args, timeout=None)
-        self.poll_id = poll_id
-        self.db = None
-
-    async def get_db(self):
-        if self.db:
-            return self.db
-        self.db = await SimplePoll.objects.get(id=self.poll_id)
-        return self.db
-
-    @button(custom_id="yes", emoji="\N{white heavy check mark}")
-    async def confirm(self, _, interaction: discord.Interaction):
-        db = await self.get_db()
-        ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
-        ends_at.replace(tzinfo=datetime.timezone.utc)
-        if datetime.datetime.utcnow() >= ends_at:
-            for child in self.children:
-                if isinstance(child, Button):
-                    if child.label in ("See results", "Delete poll"):
-                        continue
-                    child.disabled = True
-            src_message = await interaction.channel.fetch_message(db.message)
-            await src_message.edit(view=self)
-            return await interaction.response.send_message(
-                f"This poll ended {discord.utils.format_dt(ends_at, 'R')}" f"\nPress 'See results' to see the results.",
-                ephemeral=True,
-            )
-        if str(interaction.user.id) in db.voted.keys():
-            return await interaction.response.send_message("You already voted!", ephemeral=True)
-        else:
-            db.voted[str(interaction.user.id)] = True
-            await db.update(voted=db.voted)
-            await interaction.response.send_message("You voted \N{WHITE HEAVY CHECK MARK}!", ephemeral=True)
-
-    @button(custom_id="no", emoji="\N{cross mark}")
-    async def deny(self, _, interaction: discord.Interaction):
-        db = await self.get_db()
-        ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
-        ends_at.replace(tzinfo=datetime.timezone.utc)
-        if datetime.datetime.utcnow() >= ends_at:
-            for child in self.children:
-                if isinstance(child, Button):
-                    if child.label in ("See results", "Delete poll"):
-                        continue
-                    child.disabled = True
-            src_message = await interaction.channel.fetch_message(db.message)
-            await src_message.edit(view=self)
-            return await interaction.response.send_message(
-                f"This poll ended {discord.utils.format_dt(ends_at, 'R')}\nPress 'See results' to see the results.",
-                ephemeral=True,
-            )
-        if str(interaction.user.id) in db.voted.keys():
-            return await interaction.response.send_message("You already voted!", ephemeral=True)
-        else:
-            db.voted[str(interaction.user.id)] = False
-            await db.update(voted=db.voted)
-            await interaction.response.send_message("You voted \N{cross mark}!", ephemeral=True)
-
-    @button(custom_id="view", label="See results", emoji="\N{eyes}", row=2)
-    async def view_results(self, _, interaction: discord.Interaction):
-        db = await self.get_db()
-        total_yes = len([x for x in db.voted.values() if x])
-        total_no = len([x for x in db.voted.values() if not x])
-        total = len(db.voted.keys())
-
-        def percent(part: int, whole: int) -> float:
-            return round((part / whole) * 100, 1)
-
-        if total_yes > total_no:
-            colour = discord.Colour.green()
-        elif total_yes < total_no:
-            colour = discord.Colour.red()
-        else:
-            colour = discord.Colour.blue()
-
-        ends_at = datetime.datetime.fromtimestamp(float(db.ends_at))
-        ends_at.replace(tzinfo=datetime.timezone.utc)
-        # viewable = sum(1 for x in interaction.message.channel.members if x.bot is False)
-
-        embed = discord.Embed(
-            title=f"Poll results:",
-            description=f"Yes (\N{WHITE HEAVY CHECK MARK}): {total_yes:,} ({percent(total_yes, total)}%)\n"
-            f"No (\N{cross mark}): {total_no:,} ({percent(total_no, total)}%)\n"
-            f"Total votes: {total:,}\n"
-            # f"({percent(total, viewable)}% of members who can vote)\n"
-            f"Poll ends/ended {discord.utils.format_dt(ends_at, 'R')}.",
-            colour=colour,
-        )
-
-        if interaction.user.id == db.owner or datetime.datetime.utcnow() >= ends_at:
-            _view = SimplePollViewSeeResultsViewVotersView(self.db.voted, interaction)
-            if not interaction.user.guild_permissions.administrator:
-                _view = None
-            return await interaction.response.send_message(embed=embed, ephemeral=True, view=_view)
-        else:
-            return await interaction.response.send_message("You cannot view results yet!", ephemeral=True)
-
-    @button(custom_id="delete", label="Delete poll", style=ButtonStyle.red, emoji="\N{wastebasket}\U0000fe0f", row=2)
-    async def delete(self, _, interaction: discord.Interaction):
-        db = await self.get_db()
-        if interaction.user.id != db.owner:
-            return await interaction.response.send_message("You can't delete this poll!", ephemeral=True)
-        else:
-            message = await interaction.channel.fetch_message(db.message)
-            await message.delete()
-            await db.delete()
-            self.stop()
 
 
 class StealEmojiView(AutoDisableView):

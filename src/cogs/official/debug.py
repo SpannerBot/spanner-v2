@@ -240,6 +240,12 @@ class Debug(commands.Cog):
         finally:
             del t
 
+    @commands.group(name="cogs", invoke_without_subcommand=True)
+    @commands.is_owner()
+    async def cogs(self, ctx: commands.Context):
+        """Cog management. This command on its own lists all cogs."""
+        return await ctx.reply("wip")
+
 
 def setup(bot):
     bot.add_cog(Debug(bot))

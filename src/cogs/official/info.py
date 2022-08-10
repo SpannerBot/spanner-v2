@@ -1,4 +1,6 @@
 import datetime
+import json
+import os
 import platform
 import re
 import subprocess
@@ -6,9 +8,10 @@ import sys
 import textwrap
 import time
 from io import BytesIO
+from pathlib import Path
 from textwrap import shorten
 from typing import Union, Tuple, Optional, List
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote_plus
 
 import bs4
 import discord
@@ -20,6 +23,7 @@ from discord.ext import commands, pages
 from src import utils
 from src.bot.client import Bot
 from src.utils.views import StealEmojiView
+from src.vendor import humanize
 
 verification_levels = {
     discord.VerificationLevel.none: "Unrestricted",
@@ -377,12 +381,51 @@ class Info(commands.Cog):
         embeds = []
         user: Union[discord.User, discord.Member]
         user = user or ctx.user
+        update = None
         if user == self.bot.user:
+            await ctx.defer(ephemeral=True)
+            appinfo = await self.bot.application_info()
             latency = round(self.bot.latency * 1000, 2)
-            spanner_version = await utils.run_blocking(
-                subprocess.run, ("git", "rev-parse", "--short", "HEAD"), capture_output=True, encoding="utf-8"
-            )
-            spanner_version = spanner_version.stdout.strip()
+            try:
+                proc: subprocess.CompletedProcess = await utils.run_blocking(
+                    subprocess.run, ("pipx", "runpip", "spanner", "list", "--format=json"),
+                    capture_output=True, encoding="utf-8"
+                )
+                if "not found" in proc.stdout or not proc.stdout.strip():
+                    # Not installed via pipx. Default to git.
+                    raise FileNotFoundError("Not installed via pipx.")
+                try:
+                    data = json.loads(proc.stdout)
+                except json.JSONDecodeError:
+                    spanner_version = "error (invalid version output)"
+                else:
+                    spanner_version_raw = discord.utils.find(
+                        lambda p: p["name"] == "spanner",
+                        data
+                    ) or {"name": "spanner", "version": "0.0.0a00000000"}
+                    spanner_version_match = re.match(
+                        r"(\d\.\d\.\d)(a|b|rc|f)(\w+)",
+                        spanner_version_raw["version"]
+                    )
+                    try:
+                        spanner_version = spanner_version_match.group(3)
+                        latest_version = await utils.session.get(
+                            "https://github.com/repos/EEKIM10/spanner-v2/commits"
+                        )
+                        latest_version = latest_version.json()[0]["sha"][:len(spanner_version)]
+                        if latest_version != spanner_version:
+                            update = latest_version
+                    except IndexError:
+                        spanner_version = spanner_version_match.group()
+                    except AttributeError:
+                        spanner_version = "unknown-pipx"  # no match
+            except FileNotFoundError:
+                proc = await utils.run_blocking(
+                    subprocess.run, ("git", "rev-parse", "--short", "HEAD"), capture_output=True, encoding="utf-8"
+                )
+                spanner_version = proc.stdout.strip()
+
+            spanner_version = spanner_version or "unknown-git"
 
             if platform.system().lower() == "windows":
                 os_version = f"{platform.system()} {platform.release()}"
@@ -406,27 +449,90 @@ class Info(commands.Cog):
 
             sys_started = discord.utils.utcnow() - datetime.timedelta(seconds=time.monotonic())
 
+            ram_used = system_ram_used = system_ram_total = cpu_percent = system_cpu = 0.0
+            per_cpu = [0.0] * os.cpu_count()
+            disk_usage = (0.0, 1.0)
+            proc_id = 0
+            try:
+                import psutil
+            except ImportError:
+                psutil = None
+            else:
+                system_cpu = await utils.run_blocking(psutil.cpu_percent, 1)
+                per_cpu = [round(x, 1) for x in await utils.run_blocking(psutil.cpu_percent, 1, True)]
+                system_ram = await utils.run_blocking(psutil.virtual_memory)
+                system_ram_used = system_ram.used
+                system_ram_total = system_ram.total
+                process = psutil.Process()
+                with process.oneshot():
+                    cpu_percent = await utils.run_blocking(process.cpu_percent, 1)
+                    _mem_info = await utils.run_blocking(process.memory_full_info)
+                    ram_used = _mem_info.uss
+                    proc_id = process.pid
+                disk_usage = psutil.disk_usage(Path(__file__).drive)
+
             embed = discord.Embed(
                 title="My Information:",
-                description=f"WebSocket Latency (ping): {latency}ms\n"
-                f"Bot Started: {discord.utils.format_dt(self.bot.started_at, 'R')}\n"
-                f"System Started: {discord.utils.format_dt(sys_started, 'R')}\n"
-                f"Bot Last Connected: {discord.utils.format_dt(self.bot.last_logged_in, 'R')}\n"
-                f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}\n"
-                f"\n"
-                f"Cached Users: {len(self.bot.users):,}\n"
-                f"Guilds: {len(self.bot.guilds):,}\n"
-                f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
-                f"Total Emojis: {len(self.bot.emojis):,}\n"
-                f"Cached Messages: {len(self.bot.cached_messages):,}\n"
-                f"\n"
-                f"Python Version: {sys.version.split(' ')[0]}\n"
-                f"Pycord Version: {discord.__version__}\n"
-                f"Bot Version: [v2#{spanner_version}](https://github.com/EEKIM10/spanner-v2/tree/{spanner_version})\n"
-                f"OS Version: {os_version}\n",
+                description=f"Owner: {appinfo.owner.mention}\n"
+                            f"Bot public: {'Yes' if appinfo.bot_public else 'No'}\n"
+                            f"Bot requires oauth2 grant: {'Yes' if appinfo.bot_require_code_grant else 'No'}",
                 colour=0x049319,
                 timestamp=discord.utils.utcnow(),
             )
+            if appinfo.terms_of_service_url:
+                embed.description += f"\n[Terms of Service]({appinfo.terms_of_service_url})"
+            if appinfo.privacy_policy_url:
+                embed.description += f"\n[Privacy Policy]({appinfo.privacy_policy_url})"
+            if appinfo.team:
+                embed.description += f"\nTeam: {appinfo.team.name}\n" \
+                                     f"Team members: {', '.join(map(lambda u: u.mention, appinfo.team.members))}"
+
+            embed.add_field(
+                name="Timing information",
+                value=f"WebSocket Latency (ping): {latency}ms\n"
+                f"Bot Started: {discord.utils.format_dt(self.bot.started_at, 'R')}\n"
+                f"System Started: {discord.utils.format_dt(sys_started, 'R')}\n"
+                f"Bot Last Connected: {discord.utils.format_dt(self.bot.last_logged_in, 'R')}\n"
+                f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}"
+            )
+            embed.add_field(
+                name="Cache & stats info",
+                value=f"Cached Users: {len(self.bot.users):,}\n"
+                f"Guilds: {len(self.bot.guilds):,}\n"
+                f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
+                f"Total Emojis: {len(self.bot.emojis):,}\n"
+                f"Cached Messages: {len(self.bot.cached_messages):,}",
+                inline=False
+            )
+            embed.add_field(
+                name="Version info:",
+                value=f"Python Version: {sys.version.split(' ')[0]}\n"
+                f"Pycord Version: {discord.__version__}\n"
+                f"Bot Version: [v2#{spanner_version}](https://github.com/EEKIM10/spanner-v2/tree/"
+                      f"{quote_plus(spanner_version)})\n"
+                f"OS Version: {os_version}",
+                inline=False
+            )
+            if psutil:
+                b = os.name != "nt"
+                disk_used_nice = humanize.naturalsize(disk_usage.used, binary=b)
+                disk_total_nice = humanize.naturalsize(disk_usage.total, binary=b)
+                proc_mem = humanize.naturalsize(ram_used, binary=b)
+                sys_mem_u = humanize.naturalsize(system_ram_used, binary=b)
+                sys_mem_t = humanize.naturalsize(system_ram_total, binary=b)
+                embed.add_field(
+                    name="System Stats",
+                    value=f"CPU Usage: {system_cpu}% ({cpu_percent}% for this process, per-core: "
+                          f"{' '.join(map(lambda p: f'{p}%', per_cpu))})\n"
+                          f"RAM Usage: {sys_mem_u}/{sys_mem_t} ({proc_mem} for this process)\n"
+                          f"Disk Usage: {disk_used_nice}/{disk_total_nice}\n"
+                          f"Process ID: {proc_id}",
+                    inline=False
+                )
+            if update is not None:
+                embed.set_footer(
+                    text=f"\N{warning sign} New version available: {update}. Run `pipx upgrade spanner` to update."
+                )
             embeds.append(embed)
 
         if ctx.guild:
@@ -445,7 +551,7 @@ class Info(commands.Cog):
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         embeds.append(embed)
-        return await ctx.respond(embeds=embeds)
+        return await ctx.respond(embeds=embeds, ephemeral=user == self.bot.user)
 
     @commands.user_command(name="User Info")
     async def user_info_user_command(self, ctx: discord.ApplicationContext, user: Union[discord.User, discord.Member]):

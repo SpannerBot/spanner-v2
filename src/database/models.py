@@ -1,7 +1,7 @@
 import datetime
 import enum
 import uuid
-from typing import TYPE_CHECKING, Optional, Dict
+from typing import TYPE_CHECKING, Optional
 
 import databases
 import discord.utils
@@ -16,7 +16,6 @@ __all__ = (
     "Errors",
     "CommandType",
     "DB_STAT",
-    "SimplePoll",
 )
 
 models = orm.ModelRegistry(databases.Database("sqlite:///main.db"))
@@ -167,25 +166,9 @@ class Errors(orm.Model):
         full_message: Optional[str]
 
 
-class SimplePoll(orm.Model):
+class APIToken(orm.Model):
     registry = models
-    fields = dict(
-        id=orm.BigInteger(primary_key=True, default=discord.utils.generate_snowflake),
-        channel_id=orm.BigInteger(default=None, allow_null=True),
-        message=orm.BigInteger(allow_null=True, default=None),
-        guild_id=orm.BigInteger(default=None, allow_null=True),
-        owner=orm.BigInteger(),
-        ends_at=orm.Float(),
-        voted=orm.JSON(default={}),
-        ended=orm.Boolean(default=False),
-    )
-
-    if TYPE_CHECKING:
-        id: int
-        channel_id: Optional[int]
-        message: Optional[int]
-        guild_id: Optional[int]
-        owner: int
-        ends_at: float
-        voted: Dict[str, bool]
-        ended: bool
+    fields = {
+        "id": orm.BigInteger(primary_key=True, default=discord.utils.generate_snowflake),
+        "secret": orm.Text()
+    }
