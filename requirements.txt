@@ -1,4 +1,4 @@
-py-cord==2.0.0
+py-cord~=2.0
 orjson==3.7.7; sys.platform != "win32" and "64" in platform.machine
 # ^ We don't install orjson on Windows due to a lack of a native C compiler.
 # OrJSON is also 64bit only.
@@ -7,7 +7,7 @@ rich==12.5.1
 orm[sqlite]==0.3.1
 httpx==0.23.0
 
-# Don't install psutil on windows
+# Don't install psutil on Windows
 psutil==5.9.1
 
 jishkucord==2.5.2
@@ -17,3 +17,5 @@ beautifulsoup4==4.11.1
 setproctitle==1.2.3
 validators==0.20.0
 cronitor==4.5.0
+fastapi~=0.79
+uvicorn[standard]~=0.18
