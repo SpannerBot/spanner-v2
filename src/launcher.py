@@ -39,6 +39,7 @@ async def main(bot):
 
 async def launch():
     from src.bot.client import bot as bot_instance
+
     bot_instance.console.log("Preparing to launch spanner...")
 
     if Path("~/.local").exists():

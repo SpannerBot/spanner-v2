@@ -69,6 +69,7 @@ class Bot(commands.Bot):
 
         if capi := self.get_config_value("CRONITOR_API_KEY") is not None:
             from cronitor import Monitor
+
             self.cronitor = Monitor(self.get_config_value("CRONITOR_TELEMETRY_NAME") or "Spanner-Bot", capi)
             self.cronitor.ping(state="run", hostname=platform.node())
 
@@ -109,15 +110,12 @@ class Bot(commands.Bot):
         if self.cronitor is None:
             return
         await utils.run_blocking(
-            self.cronitor.ping,
-            message=message,
-            metrics={
-                "error_count": self.errors
-            },
-            hostname=platform.node()
+            self.cronitor.ping, message=message, metrics={"error_count": self.errors}, hostname=platform.node()
         )
 
-    def get_config_value(self, *names: str, default: Any = None) -> Union[str, int, float, dict, list, bool, type(None)]:
+    def get_config_value(
+        self, *names: str, default: Any = None
+    ) -> Union[str, int, float, dict, list, bool, type(None)]:
         """Fetches a config value.
 
         Lookup is in this order:

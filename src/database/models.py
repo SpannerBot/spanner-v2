@@ -168,7 +168,4 @@ class Errors(orm.Model):
 
 class APIToken(orm.Model):
     registry = models
-    fields = {
-        "id": orm.BigInteger(primary_key=True, default=discord.utils.generate_snowflake),
-        "secret": orm.Text()
-    }
+    fields = {"id": orm.BigInteger(primary_key=True, default=discord.utils.generate_snowflake), "secret": orm.Text()}

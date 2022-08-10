@@ -166,8 +166,7 @@ class Debug(commands.Cog):
             if case.full_message is not None:
                 try:
                     async with utils.session.post(
-                            "https://h.nexy7574.cyou/documents",
-                            data=case.full_message
+                        "https://h.nexy7574.cyou/documents", data=case.full_message
                     ) as response:
                         full_message = "[available here](https://h.nexy7574.cyou/" + response.json()["key"] + ")"
                 except httpx.HTTPError:

@@ -388,8 +388,10 @@ class Info(commands.Cog):
             latency = round(self.bot.latency * 1000, 2)
             try:
                 proc: subprocess.CompletedProcess = await utils.run_blocking(
-                    subprocess.run, ("pipx", "runpip", "spanner", "list", "--format=json"),
-                    capture_output=True, encoding="utf-8"
+                    subprocess.run,
+                    ("pipx", "runpip", "spanner", "list", "--format=json"),
+                    capture_output=True,
+                    encoding="utf-8",
                 )
                 if "not found" in proc.stdout or not proc.stdout.strip():
                     # Not installed via pipx. Default to git.
@@ -399,20 +401,15 @@ class Info(commands.Cog):
                 except json.JSONDecodeError:
                     spanner_version = "error (invalid version output)"
                 else:
-                    spanner_version_raw = discord.utils.find(
-                        lambda p: p["name"] == "spanner",
-                        data
-                    ) or {"name": "spanner", "version": "0.0.0a00000000"}
-                    spanner_version_match = re.match(
-                        r"(\d\.\d\.\d)(a|b|rc|f)(\w+)",
-                        spanner_version_raw["version"]
-                    )
+                    spanner_version_raw = discord.utils.find(lambda p: p["name"] == "spanner", data) or {
+                        "name": "spanner",
+                        "version": "0.0.0a00000000",
+                    }
+                    spanner_version_match = re.match(r"(\d\.\d\.\d)(a|b|rc|f)(\w+)", spanner_version_raw["version"])
                     try:
                         spanner_version = spanner_version_match.group(3)
-                        latest_version = await utils.session.get(
-                            "https://github.com/repos/EEKIM10/spanner-v2/commits"
-                        )
-                        latest_version = latest_version.json()[0]["sha"][:len(spanner_version)]
+                        latest_version = await utils.session.get("https://github.com/repos/EEKIM10/spanner-v2/commits")
+                        latest_version = latest_version.json()[0]["sha"][: len(spanner_version)]
                         if latest_version != spanner_version:
                             update = latest_version
                     except IndexError:
@@ -474,8 +471,8 @@ class Info(commands.Cog):
             embed = discord.Embed(
                 title="My Information:",
                 description=f"Owner: {appinfo.owner.mention}\n"
-                            f"Bot public: {'Yes' if appinfo.bot_public else 'No'}\n"
-                            f"Bot requires oauth2 grant: {'Yes' if appinfo.bot_require_code_grant else 'No'}",
+                f"Bot public: {'Yes' if appinfo.bot_public else 'No'}\n"
+                f"Bot requires oauth2 grant: {'Yes' if appinfo.bot_require_code_grant else 'No'}",
                 colour=0x049319,
                 timestamp=discord.utils.utcnow(),
             )
@@ -484,8 +481,10 @@ class Info(commands.Cog):
             if appinfo.privacy_policy_url:
                 embed.description += f"\n[Privacy Policy]({appinfo.privacy_policy_url})"
             if appinfo.team:
-                embed.description += f"\nTeam: {appinfo.team.name}\n" \
-                                     f"Team members: {', '.join(map(lambda u: u.mention, appinfo.team.members))}"
+                embed.description += (
+                    f"\nTeam: {appinfo.team.name}\n"
+                    f"Team members: {', '.join(map(lambda u: u.mention, appinfo.team.members))}"
+                )
 
             embed.add_field(
                 name="Timing information",
@@ -493,7 +492,7 @@ class Info(commands.Cog):
                 f"Bot Started: {discord.utils.format_dt(self.bot.started_at, 'R')}\n"
                 f"System Started: {discord.utils.format_dt(sys_started, 'R')}\n"
                 f"Bot Last Connected: {discord.utils.format_dt(self.bot.last_logged_in, 'R')}\n"
-                f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}"
+                f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}",
             )
             embed.add_field(
                 name="Cache & stats info",
@@ -502,16 +501,16 @@ class Info(commands.Cog):
                 f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
                 f"Total Emojis: {len(self.bot.emojis):,}\n"
                 f"Cached Messages: {len(self.bot.cached_messages):,}",
-                inline=False
+                inline=False,
             )
             embed.add_field(
                 name="Version info:",
                 value=f"Python Version: {sys.version.split(' ')[0]}\n"
                 f"Pycord Version: {discord.__version__}\n"
                 f"Bot Version: [v2#{spanner_version}](https://github.com/EEKIM10/spanner-v2/tree/"
-                      f"{quote_plus(spanner_version)})\n"
+                f"{quote_plus(spanner_version)})\n"
                 f"OS Version: {os_version}",
-                inline=False
+                inline=False,
             )
             if psutil:
                 b = os.name != "nt"
@@ -523,11 +522,11 @@ class Info(commands.Cog):
                 embed.add_field(
                     name="System Stats",
                     value=f"CPU Usage: {system_cpu}% ({cpu_percent}% for this process, per-core: "
-                          f"{' '.join(map(lambda p: f'{p}%', per_cpu))})\n"
-                          f"RAM Usage: {sys_mem_u}/{sys_mem_t} ({proc_mem} for this process)\n"
-                          f"Disk Usage: {disk_used_nice}/{disk_total_nice}\n"
-                          f"Process ID: {proc_id}",
-                    inline=False
+                    f"{' '.join(map(lambda p: f'{p}%', per_cpu))})\n"
+                    f"RAM Usage: {sys_mem_u}/{sys_mem_t} ({proc_mem} for this process)\n"
+                    f"Disk Usage: {disk_used_nice}/{disk_total_nice}\n"
+                    f"Process ID: {proc_id}",
+                    inline=False,
                 )
             if update is not None:
                 embed.set_footer(

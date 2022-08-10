@@ -62,7 +62,7 @@ def version(verbose: bool = False):
     spanner_version = subprocess.run(
         ("git", "rev-parse", "--short", "HEAD"), capture_output=True, encoding=sys.stdout.encoding
     )
-    spanner_version = spanner_version.stdout.strip() or 'unknown'
+    spanner_version = spanner_version.stdout.strip() or "unknown"
     spanner_version = (
         discord.utils.find(lambda item: item["name"] == "spanner", packages_data) or {"version": spanner_version}
     )["version"]
@@ -80,10 +80,7 @@ def version(verbose: bool = False):
         "py-cord version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(discord.version_info),
         "Python version: {0.major}.{0.minor}.{0.micro}{0.releaselevel[0]}{0.serial}".format(sys.version_info),
         "\t- Executable: " + sys.executable,
-        *[
-            "\t- %s Config: %s" % (name, path)
-            for name, path in configs
-        ],
+        *["\t- %s Config: %s" % (name, path) for name, path in configs],
         "Spanner version: " + spanner_version,
         "System: " + platform.platform(),
     ]
