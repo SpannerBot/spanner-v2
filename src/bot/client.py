@@ -38,16 +38,18 @@ class Bot(commands.Bot):
         if os.getenv("COLOURS", "True").lower() == "false":
             self.console.log = self.console.print
         self.home = Path(__file__).parents[1]  # /src directory.
+        self.user_cogs_directory = self.home / "cogs" / "user" / "installed"
+        self.user_cogs_data_directory = self.home / "cogs" / "user" / "data"
         if (self.home / ".." / "config.json").exists():
             with (self.home / ".." / "config.json").open() as config_file:
                 loaded = json.load(config_file)
                 self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
-                logger.debug("Loaded config.json")
+                self.console.log("[dim i]Loaded local config.json")
         elif Path("~/.config/spanner-v2/config.json").expanduser().exists():
             with Path("~/.config/spanner-v2/config.json").expanduser().open() as config_file:
                 loaded = json.load(config_file)
                 self.config: Dict[str, Union[str, int, float, dict, list, bool, type(None)]] = loaded
-                logger.debug("Loaded config.json from global config")
+                self.console.log("[dim i]Loaded config.json from global config")
         else:
             logger.warning("No config.json file exists - falling back to environment variables")
             self.config = None
@@ -69,6 +71,10 @@ class Bot(commands.Bot):
             from cronitor import Monitor
             self.cronitor = Monitor(self.get_config_value("CRONITOR_TELEMETRY_NAME") or "Spanner-Bot", capi)
             self.cronitor.ping(state="run", hostname=platform.node())
+
+        for place in [self.home, self.user_cogs_directory, self.user_cogs_data_directory]:
+            logger.info("Ensuring %s exists." % place.absolute())
+            place.mkdir(parents=True, exist_ok=True)
 
         super().__init__(
             command_prefix=utils.get_prefix,
@@ -111,7 +117,7 @@ class Bot(commands.Bot):
             hostname=platform.node()
         )
 
-    def get_config_value(self, *names: str) -> Union[str, int, float, dict, list, bool, type(None)]:
+    def get_config_value(self, *names: str, default: Any = None) -> Union[str, int, float, dict, list, bool, type(None)]:
         """Fetches a config value.
 
         Lookup is in this order:
@@ -140,6 +146,9 @@ class Bot(commands.Bot):
             if value is not ...:
                 break
 
+        if value is ...:
+            return default
+
         return value or None
 
     def _select_token(self) -> str:
@@ -153,12 +162,12 @@ class Bot(commands.Bot):
             )
             primary = old
 
-        assert primary is not None, "No production token. Please set the BOT_TOKEN environment variable."
-
         if self.debug:
             debug_token = self.get_config_value("DEV_BOT_TOKEN")
             if debug_token:
                 primary = debug_token
+        else:
+            assert primary is not None, "No production token. Please set the BOT_TOKEN in your config."
 
         assert bool(primary), "No token set. Please run `spanner setup`."
         return primary
