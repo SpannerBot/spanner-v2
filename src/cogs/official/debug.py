@@ -14,10 +14,10 @@ from src.database import Errors, models
 from src.utils import utils
 
 
-async def get_similar_case_ids(ctx: discord.AutocompleteContext) -> List[int]:
+async def get_similar_case_ids(ctx: discord.AutocompleteContext) -> List[str]:
     results: List[int] = [x.id for x in await Errors.objects.all() if str(ctx.value) in str(x.id)]
     results.sort(reverse=True)  # brings the newest case IDs first
-    return results
+    return list(map(str, results))
 
 
 class Debug(commands.Cog):
