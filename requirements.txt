@@ -1,4 +1,4 @@
-py-cord~=2.0
+py-cord==2.0.1
 orjson==3.7.11; sys.platform != "win32" and "64" in platform.machine
 # ^ We don't install orjson on Windows due to a lack of a native C compiler.
 # OrJSON is also 64bit only.
