@@ -757,16 +757,16 @@ class Info(commands.Cog):
 
         if message.reference is not None:
             resolved = message.reference.resolved
-            if resolved is None:
-                try:
-                    channel = self.bot.get_channel(message.reference.channel_id)
-                    resolved = await channel.fetch_message(message.reference.message_id)
-                except discord.HTTPException:
-                    pass
-            if resolved is not None and not isinstance(resolved, discord.DeletedReferencedMessage):
+            if not isinstance(resolved, discord.DeletedReferencedMessage):
+                jump_url = "https://discord.com/channels/{!s}/{!s}/{!s}".format(
+                    message.reference.guild_id,
+                    message.reference.channel_id,
+                    message.reference.message_id
+                )
+                mention = (message.reference.resolved.author if resolved else ctx.author).mention
                 embed.add_field(
                     name="In reply to:",
-                    value=f"[Message from {resolved.author.mention}]({message.jump_url})",
+                    value=f"[Message from {mention}]({jump_url})",
                     inline=False,
                 )
         elif message.interaction is not None:
