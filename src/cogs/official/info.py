@@ -10,7 +10,7 @@ import time
 from io import BytesIO
 from pathlib import Path
 from textwrap import shorten
-from typing import Union, Tuple, Optional, List
+from typing import Union, Tuple, Optional, List, Dict
 from urllib.parse import urlparse, quote_plus
 
 import bs4
@@ -473,7 +473,7 @@ class Info(commands.Cog):
                     _mem_info = await utils.run_blocking(process.memory_full_info)
                     ram_used = _mem_info.uss
                     proc_id = process.pid
-                disk_usage = psutil.disk_usage(Path(__file__).drive or '/')
+                disk_usage = psutil.disk_usage(Path(__file__).drive or "/")
 
             embed = discord.Embed(
                 title="My Information:",
@@ -759,9 +759,7 @@ class Info(commands.Cog):
             resolved = message.reference.resolved
             if not isinstance(resolved, discord.DeletedReferencedMessage):
                 jump_url = "https://discord.com/channels/{!s}/{!s}/{!s}".format(
-                    message.reference.guild_id,
-                    message.reference.channel_id,
-                    message.reference.message_id
+                    message.reference.guild_id, message.reference.channel_id, message.reference.message_id
                 )
                 mention = (message.reference.resolved.author if resolved else ctx.author).mention
                 embed.add_field(
@@ -1085,6 +1083,59 @@ class Info(commands.Cog):
             await paginator.respond(ctx.interaction, ephemeral=True)
         else:
             return await ctx.respond("No emojis found.")
+
+    @commands.slash_command(name="permissions")
+    @commands.guild_only()
+    async def permissions(
+            self,
+            ctx: discord.ApplicationContext,
+            user: discord.Member = None,
+            role: discord.Role = None,
+            channel: discord.abc.GuildChannel = None,
+            sort_by_enabled: discord.Option(
+                bool,
+                name="sort",
+                description="If true, this command will sort the output by enabled permissions first.",
+                default=False
+            ) = False
+    ):
+        if all((user, role)) or not any((user, role)):
+            return await ctx.respond("You must supply an argument for either user or role, not both or neither.")
+
+        result: Dict[str, bool] = {}
+        if channel:
+            permissions = channel.permissions_for(user or role)
+        else:
+            permissions = user.guild_permissions if user else role.permissions
+
+        for permission_name, permission_value in permissions:
+            result[permission_name.replace("_", " ").title()] = permission_value
+
+        if sort_by_enabled is True:
+            _result = result.copy()
+            result = {}
+            try:
+                _k = sorted(_result.keys(), key=lambda key: _result[key], reverse=True)
+            except (TypeError, ValueError, IndexError):
+                return await ctx.respond("Failed to sort. Try running this command again but set `sort` to `False`.")
+            for k in _k:
+                result[k] = _result[k]
+
+        logic_table = {
+            True: "\N{white heavy check mark}",
+            False: "\N{cross mark}"
+        }
+        embed = discord.Embed(
+            title="{!s}'s permissions{}:".format(
+                user or role,
+                f" in {channel}" if channel else ''
+            ),
+            description="\n".join(
+                f"{logic_table[v]} {p}" for p, v in result.items()
+            ),
+            colour=(user or role).colour or discord.Colour.blurple()
+        )
+        return await ctx.respond(embed=embed)
 
 
 def setup(bot):
