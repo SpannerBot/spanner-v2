@@ -19,3 +19,4 @@ validators==0.20.0
 cronitor==4.5.0
 fastapi~=0.79
 uvicorn[standard]~=0.18
+humanize==4.3.0

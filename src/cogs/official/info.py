@@ -16,6 +16,7 @@ from urllib.parse import urlparse, quote_plus
 import bs4
 import discord
 import httpx
+import humanize
 import unicodedata
 from bs4 import BeautifulSoup
 from discord.ext import commands, pages
@@ -23,7 +24,6 @@ from discord.ext import commands, pages
 from src import utils
 from src.bot.client import Bot
 from src.utils.views import StealEmojiView
-from src.vendor import humanize
 
 verification_levels = {
     discord.VerificationLevel.none: "Unrestricted",
@@ -124,7 +124,7 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
             if trusted_statuses is not None:
                 try:
                     bot.console.log(f"(UNFURLER) HEAD {url!r}")
-                    head: httpx.Response = await utils.session.head(url)
+                    head: httpx.Response = await utils.session.head(url, follow_redirects=True)
                 except httpx.HTTPError:
                     raise
                 else:
@@ -135,7 +135,7 @@ async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None,
                                 return invite_type, _m
 
             try:
-                get: httpx.Response = await utils.session.get(url)
+                get: httpx.Response = await utils.session.get(url, follow_redirects=True)
                 get.raise_for_status()
             except httpx.HTTPError:
                 raise
@@ -1089,17 +1089,17 @@ class Info(commands.Cog):
     @commands.slash_command(name="permissions")
     @commands.guild_only()
     async def permissions(
-            self,
-            ctx: discord.ApplicationContext,
-            user: discord.Member = None,
-            role: discord.Role = None,
-            channel: discord.abc.GuildChannel = None,
-            sort_by_enabled: discord.Option(
-                bool,
-                name="sort",
-                description="If true, this command will sort the output by enabled permissions first.",
-                default=False
-            ) = False
+        self,
+        ctx: discord.ApplicationContext,
+        user: discord.Member = None,
+        role: discord.Role = None,
+        channel: discord.abc.GuildChannel = None,
+        sort_by_enabled: discord.Option(
+            bool,
+            name="sort",
+            description="If true, this command will sort the output by enabled permissions first.",
+            default=False,
+        ) = False,
     ):
         if all((user, role)) or not any((user, role)):
             return await ctx.respond("You must supply an argument for either user or role, not both or neither.")
@@ -1123,19 +1123,11 @@ class Info(commands.Cog):
             for k in _k:
                 result[k] = _result[k]
 
-        logic_table = {
-            True: "\N{white heavy check mark}",
-            False: "\N{cross mark}"
-        }
+        logic_table = {True: "\N{white heavy check mark}", False: "\N{cross mark}"}
         embed = discord.Embed(
-            title="{!s}'s permissions{}:".format(
-                user or role,
-                f" in {channel}" if channel else ''
-            ),
-            description="\n".join(
-                f"{logic_table[v]} {p}" for p, v in result.items()
-            ),
-            colour=(user or role).colour or discord.Colour.blurple()
+            title="{!s}'s permissions{}:".format(user or role, f" in {channel}" if channel else ""),
+            description="\n".join(f"{logic_table[v]} {p}" for p, v in result.items()),
+            colour=(user or role).colour or discord.Colour.blurple(),
         )
         return await ctx.respond(embed=embed)
 

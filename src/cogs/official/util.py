@@ -12,9 +12,7 @@ from src.utils.views import EmbedCreatorView, AutoDisableView
 logger = logging.getLogger(__name__)
 
 
-MAX_SEARCH_OPT = Option(
-    int, "How many messages to delete. Defaults to 100.", min_value=10, max_value=5000, default=100
-)
+MAX_SEARCH_OPT = Option(int, "How many messages to delete. Defaults to 100.", min_value=10, max_value=5000, default=100)
 
 
 class Utility(commands.Cog):
@@ -69,6 +67,7 @@ class Utility(commands.Cog):
         ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
     ):
         """Deletes up to <max_search> messages by <author>."""
+
         def check(_m: discord.Message):
             if ignore_pinned is False:
                 if _m.pinned:
@@ -94,6 +93,7 @@ class Utility(commands.Cog):
         ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
     ):
         """Deletes up to <max_search> messages by non-humans."""
+
         def check(_m: discord.Message):
             if ignore_pinned is False:
                 if _m.pinned:
@@ -129,6 +129,7 @@ class Utility(commands.Cog):
         ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
     ):
         """Deletes up to <max_search> messages by humans."""
+
         def check(_m: discord.Message):
             if ignore_pinned is False:
                 if _m.pinned:
