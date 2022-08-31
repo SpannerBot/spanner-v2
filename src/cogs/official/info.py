@@ -158,6 +158,7 @@ class Info(commands.Cog):
         self.bot: Bot = bot
 
     def get_user_data(self, user: Union[discord.User, discord.Member], guild: discord.Guild = None) -> List[str]:
+        truth_table = {True: "\N{white heavy check mark}", False: "\N{cross mark}"}
         # noinspection PyUnresolvedReferences
         values = [
             f"**ID**: `{user.id}`",
@@ -173,6 +174,7 @@ class Info(commands.Cog):
             f"**Roles**: {len(user.roles):,}" if hasattr(user, "roles") else None,
             f"**Colour**: {user.colour}" if guild else None,
             f"**Top Role**: {user.top_role.mention}" if hasattr(user, "top_role") else None,
+            f"**Passed Screening?** {truth_table[not user.pending]}" if hasattr(user, "pending") else None
         ]
 
         if user.avatar is not None:
