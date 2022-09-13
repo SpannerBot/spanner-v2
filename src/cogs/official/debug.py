@@ -1,4 +1,7 @@
 import io
+import json
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Union, List
@@ -8,6 +11,7 @@ import httpx
 import orm
 from discord.ext import bridge
 from discord.ext import commands, pages as pagination
+from humanize import naturalsize, naturaltime
 
 from src.bot.client import Bot
 from src.database import Errors, models
@@ -244,6 +248,53 @@ class Debug(commands.Cog):
     async def cogs(self, ctx: commands.Context):
         """Cog management. This command on its own lists all cogs."""
         return await ctx.reply("wip")
+
+    @commands.command()
+    @commands.is_owner()
+    async def speedtest(self, ctx: commands.Context):
+        """Runs a quick speedtest"""
+        text = ""
+        msg = await ctx.reply("Running speed test...")
+        async with ctx.channel.typing():
+            try:
+                process: subprocess.CompletedProcess = await utils.run_blocking(
+                    subprocess.run,
+                    ("speedtest", "-f", "json"),
+                    capture_output=True,
+                    encoding=sys.stdout.encoding
+                )
+            except FileNotFoundError:
+                await msg.delete()
+                text = "\N{cross mark} Speedtest (<https://www.speedtest.net/apps/cli>) is not installed."
+            else:
+                if process.returncode != 0:
+                    text = "Unexpected return code %d." % process.returncode
+                else:
+                    try:
+                        data: dict = json.loads(process.stdout.strip())
+                    except json.JSONDecodeError as e:
+                        text = "Error parsing JSON data:\n" + str(e)
+                    else:
+                        ping = data.pop("ping", {"jitter": 0.0, "latency": 0.0})
+                        download = data.pop("download", {"bandwidth": 0, "bytes": 0, "elapsed": 0})
+                        upload = data.pop("upload", {"bandwidth": 0, "bytes": 0, "elapsed": 0})
+                        text = "```\nPing:\n\tJitter: {:,}ms\n\tLatency: {:,}ms\n\nDownload:" \
+                               "\n\tSpeed: {}\n\tData used: {}\n\tTime spent: {}\n\n" \
+                               "Upload:\n\tSpeed: {}\n\tData used: {}\n\tTime spent: {}\n\n" \
+                               "Packet loss: {}\nTotal time spent: {}"
+                        text = text.format(
+                            ping["jitter"],
+                            ping["latency"],
+                            naturalsize(download["bandwidth"]),
+                            naturalsize(download["bytes"]),
+                            naturaltime(download["elapsed"] / 1000),
+                            naturalsize(upload["bandwidth"]),
+                            naturalsize(upload["bytes"]),
+                            naturaltime(upload["elapsed"] / 1000),
+                            data.pop("packetLoss", 0)
+                        )
+
+        await ctx.reply(text)
 
 
 def setup(bot):

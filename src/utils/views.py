@@ -3,16 +3,20 @@ import os
 import textwrap
 import warnings
 from io import BytesIO
-from typing import Dict, List, Optional, Union, Coroutine, Callable, Any, Tuple
+from typing import Dict, List, Optional, Union, Coroutine, Callable, Any, Tuple, TYPE_CHECKING
 
 import discord
 import validators
 from discord import ButtonStyle
 from discord.ext import pages, commands
-from discord.ui import View, button
+from discord.ui import View, button, Select, Modal, InputText
 from discord.webhook.async_ import async_context
 
-__all__ = ("YesNoPrompt", "StealEmojiView", "EmbedCreatorView")
+if TYPE_CHECKING:
+    from src.database.models import Guild, ReactionRoles, ReactionRoleMenu
+    from src.bot import Bot
+
+__all__ = ("YesNoPrompt", "StealEmojiView", "EmbedCreatorView", "PersistentReactionRolesView")
 
 
 class AutoDisableView(View):
@@ -947,4 +951,279 @@ class EmbedCreatorFieldManagerFieldRemover(AutoDisableView):
         self.enable_all_items()
         await interaction.edit_original_message(view=self)
         await self.parent.edit(f"Removed {len(self.select.values)} fields.", embed=self.parent.embed)
+        self.stop()
+
+
+class PersistentReactionRolesView(View):
+    def __init__(self, bot: "Bot", guild: "Guild", menu: "ReactionRoleMenu", children: List["ReactionRoles"]):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.data = guild
+        self.guild: discord.Guild = self.bot.get_guild(self.data.id)
+        self.menu = menu
+        assert self.guild is not None
+        self._children = children
+        self.selectors: List[discord.ui.Select] = []
+        for n, chunk in discord.utils.as_chunks(children, 25):
+            if n >= 5:
+                raise RuntimeError("Too many role chunks.")
+            select = discord.ui.Select(
+                custom_id="chunk-%s" % n, placeholder="Roles - page %s" % n, min_values=0, max_values=len(chunk)
+            )
+            for entry in chunk:
+                entry: "ReactionRoles"
+                role: Optional[discord.Role] = self.guild.get_role(entry.role)
+                if not role:
+                    continue
+                select.add_option(
+                    label="@" + role.name, value=str(role.id), description=entry.description, emoji=entry.emoji
+                )
+            select.max_values = len(select.options)
+            self.set_callback(select)
+            self.selectors.append(select)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return (
+            interaction.user is not None
+            and interaction.user.guild is not None
+            and interaction.user.bot is False
+            and interaction.user.timed_out is False
+        )
+
+    def set_callback(self, me: discord.ui.Select):
+        async def callback(interaction: discord.Interaction):
+            user_roles = interaction.user.roles
+            selected: List[str] = me.values
+            delta_remove: List[discord.Role] = []
+            delta_add: List[discord.Role] = []
+            for role in user_roles:
+                reaction_role: Optional["ReactionRoles"] = discord.utils.get(self._children, role=role.id)
+                if str(role.id) not in selected and reaction_role is not None:
+                    # User un-selected this one.
+                    delta_remove.append(role)
+
+            for selection in selected:
+                role: Optional[discord.Role] = self.guild.get_role(int(selection))
+                if role is None:
+                    continue
+                if role not in user_roles and role < self.guild.me.top_role:
+                    delta_add.append(role)
+
+            await interaction.response.defer(ephemeral=True)
+            minus_emoji = str(discord.utils.get(self.bot.emojis, id=1009875597629067264) or "\N{heavy minus sign}")
+            plus_emoji = str(discord.utils.get(self.bot.emojis, id=1009875607364055211) or "\N{heavy plus sign}")
+            summary = {"added": [], "removed": []}
+            if delta_add:
+                try:
+                    await interaction.user.add_roles(
+                        *delta_add, reason="Reaction role: %s" % self.menu.entry_id, atomic=False
+                    )
+                except discord.HTTPException as e:
+                    summary["added"] = [f"\N{cross mark} Failed - {e}"]
+                else:
+                    summary["added"] = [x.name for x in delta_add]
+
+            if delta_remove:
+                try:
+                    await interaction.user.remove_roles(
+                        *delta_remove, reason="Reaction role: %s" % self.menu.entry_id, atomic=False
+                    )
+                except discord.HTTPException as e:
+                    summary["removed"] = [f"\N{cross mark} Failed - {e}"]
+                else:
+                    summary["removed"] = [x.name for x in delta_remove]
+
+            added = "\n".join(f"\t• {role.mention}" for role in summary["added"])
+            removed = "\n".join(f"\t• {role.mention}" for role in summary["removed"])
+
+            return await interaction.followup.send(
+                f"Changed roles!\n\n{plus_emoji}\n{added}\n\n{minus_emoji}\n{removed}"
+            )
+
+        me.callback = callback
+        return callback
+
+
+# Stolen from
+# https://github.com/EEKIM10/trident-bot/blob/f8636595989ecccaf9d82c826b30127f65b6aaa5/utils/views.py#L72
+class ChannelSelectorView(View):
+    class Selector(Select):
+        def __init__(self, channels: List[discord.abc.GuildChannel], channel_type: str, is_filtered: bool = False):
+            super().__init__(placeholder="Select a %s%s" % (channel_type, (" (filtered)" if is_filtered else "")))
+            self.channel_type = channel_type
+            for category in list(sorted(channels, key=lambda x: x.position))[:25]:
+                emojis = {
+                    discord.TextChannel: "<:text_channel:923666787038531635>",
+                    discord.VoiceChannel: "<:voice_channel:923666789798379550>",
+                    discord.CategoryChannel: "<:category:924001844290781255>",
+                    discord.StageChannel: "<:stage_channel:923666792705032253>",
+                }
+                # noinspection PyTypeChecker
+                self.add_option(label=category.name, emoji=emojis.get(type(category), ""), value=str(category.id))
+
+        async def callback(self, interaction: discord.Interaction):
+            self.view.chosen = self.values[0]
+            await interaction.response.defer(invisible=True)
+            self.view.stop()
+
+    class SearchChannels(Modal):
+        def __init__(self):
+            super().__init__(title="Enter a search term (empty to clear)")
+            self.add_item(
+                InputText(
+                    label="Search term:",
+                    placeholder="e.g. 'gen' will display all channels with 'gen' in their name",
+                    min_length=1,
+                    max_length=100,
+                    required=False,
+                )
+            )
+            self.term = None
+
+        async def callback(self, interaction: discord.Interaction):
+            self.term = self.children[0].value
+            await interaction.response.defer(invisible=True)
+            self.stop()
+
+    def __init__(self, channel_getter: Callable[[], List[discord.abc.GuildChannel]], channel_type: str = "category"):
+        super().__init__()
+        self.chosen = None
+        self._channel_getter = channel_getter
+        self.channel_type = channel_type
+        self.search_term = None
+        self.add_item(self.create_selector())
+
+    def channel_getter(self) -> List[discord.abc.GuildChannel]:
+        original = self._channel_getter()
+        if self.search_term is not None:
+            return [c for c in original if self.search_term.lower().strip() in c.name.lower().strip()]
+        return original
+
+    def create_selector(self):
+        return self.Selector(self.channel_getter(), self.channel_type, self.search_term is not None)
+
+    @button(label="Refresh", emoji="\U0001f504", style=discord.ButtonStyle.blurple)
+    async def do_refresh(self, _, interaction: discord.Interaction):
+        for child in self.children:
+            if isinstance(child, discord.ui.Select):
+                self.remove_item(child)
+        self.add_item(self.create_selector())
+        await interaction.response.defer(invisible=True)
+        await interaction.edit_original_message(view=self)
+
+    @button(label="Search", emoji="\U0001f50d")
+    async def do_select_via_name(self, _, interaction: discord.Interaction):
+        modal = self.SearchChannels()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        self.search_term = modal.term
+        if len(self.channel_getter()) == 0:
+            self.search_term = None
+            await interaction.followup.send(
+                "No channels match the criteria %r. Try again." % modal.term, ephemeral=True
+            )
+            return
+        for child in self.children:
+            if isinstance(child, discord.ui.Select):
+                self.remove_item(child)
+                break
+        new = self.create_selector()
+        self.add_item(new)
+        await interaction.edit_original_message(view=self)
+
+    @button(label="Cancel", emoji="\N{black square for stop}", style=discord.ButtonStyle.red)
+    async def do_cancel(self, _, __):
+        self.stop()
+
+
+class RoleSelectorView(View):
+    roles: List[int]
+
+    class Selector(Select):
+        def __init__(self, roles: List[discord.Role], ranges: Tuple[int, int] = (1, 1), filtered: bool = False):
+            super().__init__(
+                placeholder="Select a role{}".format(" (filtered)" if filtered else ""),
+                min_values=ranges[0],
+                max_values=ranges[1],
+            )
+            for role in list(sorted(roles, key=lambda r: r.position, reverse=True))[:25]:
+                self.add_option(
+                    label=("@" + role.name)[:25],
+                    value=str(role.id),
+                    description=f"@{role.name}" if len("@" + role.name) > 25 else None,
+                )
+
+            if self.max_values > len(self.options):
+                self.max_values = len(self.options)
+
+        async def callback(self, interaction: discord.Interaction):
+            self.view.roles = list(map(int, self.values))
+            await interaction.response.defer(invisible=True)
+            self.view.stop()
+
+    class SearchRoles(Modal):
+        def __init__(self):
+            super().__init__(title="Put a search term (empty to clear)")
+            self.add_item(
+                InputText(
+                    label="Search term:",
+                    placeholder="e.g. 'admin' will display all roles with 'admin' in their name",
+                    min_length=1,
+                    max_length=100,
+                    required=False,
+                )
+            )
+            self.term = None
+
+        async def callback(self, interaction: discord.Interaction):
+            self.term = self.children[0].value
+            await interaction.response.defer(invisible=True)
+            self.stop()
+
+    def __init__(
+        self,
+        # roles_getter: Callable[[], Union[List[discord.Role], Coroutine[Any, Any, List[discord.Role]]]],
+        roles_getter: Callable[[], List[discord.Role]],
+        ranges: Tuple[int, int] = (1, 1),
+    ):
+        super().__init__()
+        self.roles_getter = roles_getter
+        self.search_term = None
+        self.ranges = ranges
+        self.roles = []
+        self.add_item(self.create_selector())
+
+    def create_selector(self) -> "Selector":
+        return self.Selector(self.get_roles(), self.ranges, self.search_term is not None)
+
+    def get_roles(self) -> List[discord.Role]:
+        fetched = self.roles_getter()
+        if self.search_term is not None:
+            fetched = [role for role in fetched if self.search_term.lower().strip() in role.name.lower().strip()]
+        return fetched
+
+    @button(label="Refresh", emoji="\U0001f504", style=discord.ButtonStyle.blurple)
+    async def do_refresh(self, _, interaction: discord.Interaction):
+        self.remove_item(self.children[2])
+        new = self.create_selector()
+        self.add_item(new)
+        await interaction.response.defer(invisible=True)
+        await interaction.edit_original_message(view=self)
+
+    @button(label="Search", emoji="\U0001f50d")
+    async def do_select_via_name(self, _, interaction: discord.Interaction):
+        modal = self.SearchRoles()
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        if len(self.get_roles()) == 0:
+            await interaction.followup.send("No roles match that criteria. Try again.", ephemeral=True)
+            return
+        self.search_term = modal.term
+        self.remove_item(self.children[2])
+        new = self.create_selector()
+        self.add_item(new)
+        await interaction.edit_original_message(view=self)
+
+    @button(label="Cancel", emoji="\N{black square for stop}", style=discord.ButtonStyle.red)
+    async def do_cancel(self, _, __):
         self.stop()

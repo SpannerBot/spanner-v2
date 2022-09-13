@@ -183,7 +183,7 @@ class Moderation(commands.Cog):
 
         try:
             await member.send(embed=embed)
-        except discord.Forbidden:
+        except discord.HTTPException:
             embed.set_footer(text=embed.footer.text + f" | Please enable DMs, {member.name}.")
             await ctx.send(member.mention, embed=embed)
             content = f"Logged a warning for {member.mention}. Case {case.id}."

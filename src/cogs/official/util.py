@@ -1,160 +1,23 @@
 import asyncio
-import copy
 import logging
-import sys
-import textwrap
-from collections import deque
-from typing import Dict, List, Literal
 
 import discord
 from discord import SlashCommandGroup
-from discord.commands import Option, permissions
-from discord.ext import commands, pages
+from discord.commands import Option
+from discord.ext import commands
 
 from src.bot.client import Bot
 from src.utils.views import EmbedCreatorView, AutoDisableView
-from src.vendor.humanize.size import naturalsize
 
 logger = logging.getLogger(__name__)
+
+
+MAX_SEARCH_OPT = Option(int, "How many messages to delete. Defaults to 100.", min_value=10, max_value=5000, default=100)
 
 
 class Utility(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot: Bot = bot
-        self.deleted_snipes: Dict[discord.TextChannel, deque] = {}
-        self.edited_snipes: Dict[discord.TextChannel, deque] = {}
-        self.poll_expire_loop.start()
-
-    def cog_unload(self):
-        self.poll_expire_loop.cancel()
-
-    @commands.Cog.listener()
-    async def on_bulk_message_delete(self, messages: List[discord.Message]):
-        logger.debug("Got bulk message delete event with %s messages.", len(messages))
-        for message in messages:
-            logger.debug("Processing message delete for message %s-%s", message.channel.id, message.id)
-            await self.on_message_delete(message)
-
-    @commands.Cog.listener()
-    async def on_message_delete(self, message: discord.Message):
-        message_copy = copy.copy(message)
-        if message.channel not in self.deleted_snipes:
-            logger.debug("Creating new delete-snipe queue for channel %r.", message.channel.id)
-            self.deleted_snipes[message.channel] = deque([message_copy], maxlen=1000)
-        else:
-            self.deleted_snipes[message.channel].append(message_copy)
-            logger.debug(
-                "Channel %r already has a delete-deque, of size %s.",
-                message.channel.id,
-                len(self.deleted_snipes[message.channel]),
-            )
-
-    @commands.Cog.listener()
-    async def on_message_edit(self, before: discord.Message, after: discord.Message):
-        if before.author == self.bot.user:
-            return
-        if before.channel not in self.edited_snipes:
-            logger.debug("Creating new edit-snipe queue for channel %r.", after.channel.id)
-            self.edited_snipes[before.channel] = deque([[before, after]], maxlen=1000)
-        else:
-            self.edited_snipes[before.channel].append([before, after])
-            logger.debug(
-                "Channel %r already has an edit-deque, of size %s.",
-                after.channel.id,
-                len(self.edited_snipes[before.channel]),
-            )
-
-    # BEGIN COMMANDS
-
-    snipe = SlashCommandGroup(
-        "snipe",
-        "Shows you deleted and edited messages in the current channel, up to 1000, newest to oldest.",
-    )
-
-    @snipe.command()
-    @discord.guild_only()
-    async def deleted(self, ctx: discord.ApplicationContext):
-        """Shows you deleted messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
-        await ctx.defer()
-        _pages = []
-        if ctx.channel in self.deleted_snipes:
-            for message in reversed(self.deleted_snipes[ctx.channel]):
-                embed = discord.Embed(
-                    description=message.content or "[no content]",
-                    timestamp=message.created_at,
-                    colour=message.author.colour if message.author.colour else discord.Colour.random(),
-                )
-                embed.set_author(name=f"{message.author.display_name}", icon_url=message.author.avatar.url)
-                if not message.content and len(message.embeds) == 1:
-                    embed = message.embeds[0]
-                    embed.set_footer(text=f"[from {message.author}] | " + embed.footer.text)
-
-                _pages.append(embed)
-        else:
-            return await ctx.respond("No snipes of this type.")
-
-        paginator = pages.Paginator(_pages)
-        await paginator.respond(ctx.interaction)
-
-    @snipe.command()
-    @permissions.guild_only()
-    async def edits(self, ctx: discord.ApplicationContext):
-        """Shows you edited messages in the current channel, up to 1000 messages ago. Newest -> oldest"""
-        await ctx.defer()
-        _pages = []
-        if ctx.channel in self.edited_snipes:
-            for message in reversed(self.edited_snipes[ctx.channel]):
-                embed = discord.Embed(
-                    timestamp=message[1].created_at,
-                    colour=message[1].author.colour if message[1].author.colour else discord.Colour.random(),
-                )
-                embed.set_author(name=f"{message[1].author.display_name}", icon_url=message[1].author.avatar.url)
-                embed.add_field(
-                    name="Before", value=textwrap.shorten(message[0].content, 1024, placeholder="...") or "[no content]"
-                )
-                embed.add_field(
-                    name="After", value=textwrap.shorten(message[1].content, 1024, placeholder="...") or "[no content]"
-                )
-
-                _pages.append(embed)
-        else:
-            return await ctx.respond("No snipes of this type.")
-
-        paginator = pages.Paginator(_pages)
-        await paginator.respond(ctx.interaction)
-
-    @snipe.command(name="info")
-    @commands.is_owner()
-    async def snipes_info(
-        self, ctx: discord.ApplicationContext, snipe_type: discord.Option(choices=["all", "deleted", "edited"])
-    ):
-        """(owner only) displays information on a specific snipe cache"""
-        await ctx.defer()
-
-        def generate_embed(attr_name: Literal["deleted_snipes", "edited_snipes"]):
-            attr = getattr(self, attr_name)
-            size = sys.getsizeof(attr)
-            embed = discord.Embed(
-                title=f"self.{attr_name}:",
-                description=f"**Channel Entries (keys)**: {len(attr):,}\n"
-                f"**Total Messages**: {sum(len(channel_snipes) for channel_snipes in attr.values()):,}\n"
-                f"**Memory used**: {naturalsize(size, True)}",
-                colour=discord.Colour.random(),
-            )
-            return embed
-
-        embeds = []
-
-        if snipe_type == "all":
-            embeds.append(generate_embed("deleted_snipes"))
-            embeds.append(generate_embed("edited_snipes"))
-        elif snipe_type == "deleted":
-            embeds.append(generate_embed("deleted_snipes"))
-        elif snipe_type == "edited":
-            embeds.append(generate_embed("edited_snipes"))
-        else:
-            embeds.append(discord.Embed(description="Invalid snipe type."))
-        return await ctx.respond(embeds=embeds)
 
     purge = SlashCommandGroup(
         "purge",
@@ -170,9 +33,7 @@ class Utility(commands.Cog):
     async def limit(
         self,
         ctx: discord.ApplicationContext,
-        max_search: Option(
-            int, "How many messages to delete. Defaults to 100.", min_value=10, max_value=5000, default=100
-        ),
+        max_search: MAX_SEARCH_OPT,
         ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
     ):
         """Deletes up to <max_search> messages."""
@@ -191,6 +52,105 @@ class Utility(commands.Cog):
         top_authors.sort(key=lambda a: authors_count[a], reverse=True)
         top_authors = top_authors[:10]
         value = f"Deleted {len(messages):,} messages.\nAuthor breakdown:\n" + "\n".join(
+            f"<@{uid}>: {authors_count[uid]:,} ({round(authors_count[uid] / len(messages))}% of messages)"
+            for uid in top_authors
+        )
+        return await ctx.respond(value, ephemeral=True)
+
+    @purge.command(name="messages-by")
+    @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    async def by(
+        self,
+        ctx: discord.ApplicationContext,
+        author: discord.User,
+        max_search: MAX_SEARCH_OPT,
+        ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
+    ):
+        """Deletes up to <max_search> messages by <author>."""
+
+        def check(_m: discord.Message):
+            if ignore_pinned is False:
+                if _m.pinned:
+                    return False
+
+            return _m.author == author
+
+        await ctx.defer(ephemeral=True)
+        messages = await ctx.channel.purge(
+            limit=max_search,
+            check=check,
+            reason=f"Authorised by {ctx.author}.",
+        )
+        value = f"Deleted {len(messages):,} messages by {author.mention}."
+        return await ctx.respond(value, ephemeral=True)
+
+    @purge.command(name="messages-by-bots")
+    @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    async def by(
+        self,
+        ctx: discord.ApplicationContext,
+        max_search: MAX_SEARCH_OPT,
+        ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
+    ):
+        """Deletes up to <max_search> messages by non-humans."""
+
+        def check(_m: discord.Message):
+            if ignore_pinned is False:
+                if _m.pinned:
+                    return False
+
+            return _m.author.bot or _m.author.system
+
+        await ctx.defer(ephemeral=True)
+        messages = await ctx.channel.purge(
+            limit=max_search,
+            check=check,
+            reason=f"Authorised by {ctx.author}.",
+        )
+        authors = [x.author.id for x in messages]
+        authors_count = {}
+        for author in authors:
+            authors_count[author] = authors_count.get(author, 0) + 1
+        top_authors = list(set(authors))
+        top_authors.sort(key=lambda a: authors_count[a], reverse=True)
+        top_authors = top_authors[:10]
+        value = f"Deleted {len(messages):,} messages by bots or system.\nAuthor breakdown:\n" + "\n".join(
+            f"<@{uid}>: {authors_count[uid]:,} ({round(authors_count[uid] / len(messages))}% of messages)"
+            for uid in top_authors
+        )
+        return await ctx.respond(value, ephemeral=True)
+
+    @purge.command(name="messages-by-humans")
+    @commands.bot_has_permissions(manage_messages=True, read_messages=True, read_message_history=True)
+    async def by(
+        self,
+        ctx: discord.ApplicationContext,
+        max_search: MAX_SEARCH_OPT,
+        ignore_pinned: Option(bool, "If pinned messages should be left alone. Defaults to True.", default=True),
+    ):
+        """Deletes up to <max_search> messages by humans."""
+
+        def check(_m: discord.Message):
+            if ignore_pinned is False:
+                if _m.pinned:
+                    return False
+
+            return not any((_m.author.bot, _m.author.system))
+
+        await ctx.defer(ephemeral=True)
+        messages = await ctx.channel.purge(
+            limit=max_search,
+            check=check,
+            reason=f"Authorised by {ctx.author}.",
+        )
+        authors = [x.author.id for x in messages]
+        authors_count = {}
+        for author in authors:
+            authors_count[author] = authors_count.get(author, 0) + 1
+        top_authors = list(set(authors))
+        top_authors.sort(key=lambda a: authors_count[a], reverse=True)
+        top_authors = top_authors[:10]
+        value = f"Deleted {len(messages):,} messages by humans.\nAuthor breakdown:\n" + "\n".join(
             f"<@{uid}>: {authors_count[uid]:,} ({round(authors_count[uid] / len(messages))}% of messages)"
             for uid in top_authors
         )
@@ -328,7 +288,6 @@ class Utility(commands.Cog):
 
     @embed_command.command(name="create")
     @commands.bot_has_permissions(embed_links=True)
-    # @utils.disable_unless_owner()
     async def create_embed(
         self,
         ctx: discord.ApplicationContext,
