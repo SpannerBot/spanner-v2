@@ -8,7 +8,7 @@ orm[sqlite]==0.3.1
 httpx==0.23.0
 
 # Don't install psutil on Windows
-psutil==5.9.1
+psutil==5.9.2
 
 jishkucord==2.5.2
 greenlet==1.1.2
