@@ -8,7 +8,7 @@ orm[sqlite]==0.3.1
 httpx==0.23.0
 
 # Don't install psutil on Windows
-psutil==5.9.1
+psutil==5.9.2
 
 jishkucord==2.5.2
 greenlet==1.1.2
@@ -17,6 +17,6 @@ beautifulsoup4==4.11.1
 setproctitle==1.3.2
 validators==0.20.0
 cronitor==4.5.0
-fastapi~=0.79
+fastapi~=0.83
 uvicorn[standard]~=0.18
 humanize==4.3.0
