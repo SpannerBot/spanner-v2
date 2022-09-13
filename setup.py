@@ -15,6 +15,7 @@ setup(
     py_modules=["spanner"],
     packages=find_packages(),
     install_requires=requirements,
+    extras_requires={"monitoring": ["cronitor==4.6.0"]},
     entry_points={
         "console_scripts": ["spanner-cli = spanner:cli"],
     },
