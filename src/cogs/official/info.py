@@ -265,6 +265,7 @@ class Info(commands.Cog):
             f"**Boost Count**: {guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
             f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(guild.premium_progress_bar_enabled)}",
             f"**Invites**: {invites}",
+            f"**Invites Paused?** {utils.Emojis.bool('INVITES_DISABLED' in guild.features)}"
             f"**Webhooks**: {webhooks}",
             f"**Bans**: {bans}",
             f"**Categories**: {len(guild.categories)}",
