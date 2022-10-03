@@ -354,8 +354,10 @@ class Info(commands.Cog):
 
         embeds = []
         files = []
+        # N.B: There is no reason to use setattr() in this if block, but I'm lazy
         if hasattr(user, "guild_avatar") and user.guild_avatar is not None:
             content, embed, file = await self.parse_avatar(user.guild_avatar)
+            setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
             if content:
                 await ctx.respond(content, embed=embed, file=file)
             else:
@@ -370,7 +372,10 @@ class Info(commands.Cog):
             embeds.append(embed)
             if file:
                 files.append(file)
-
+            embeds = [
+                setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
+                for embed in embeds
+            ]
             return await ctx.respond(None, embeds=embeds, files=files)
 
     @commands.user_command(name="Avatar")
