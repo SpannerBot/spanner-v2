@@ -314,6 +314,7 @@ def run(pass_path: bool = False):
     os.chdir(Path(launcher.__file__).parents[1])
     click.echo(f"{get_time()} Changed working directory to %s." % Path(launcher.__file__).parents[1])
     try:
+        click.echo(f"{get_time()} Handing off to launcher")
         asyncio.run(launcher.launch())
     finally:
         click.echo(f"{get_time()} Bot process finished.")

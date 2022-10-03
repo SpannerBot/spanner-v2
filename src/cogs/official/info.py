@@ -217,8 +217,10 @@ class Info(commands.Cog):
 
         if guild.me.guild_permissions.manage_guild:
             invites = len(await guild.invites())
+            automod_rules = len(await guild.fetch_auto_moderation_rules())
         else:
             invites = "Missing 'manage server' permission."
+            automod_rules = "Missing 'manage server' permission."
 
         if guild.me.guild_permissions.manage_webhooks:
             webhooks = len(await guild.webhooks())
@@ -265,9 +267,10 @@ class Info(commands.Cog):
             f"**Boost Count**: {guild.premium_subscription_count:,}",  # if a guild has over 1k boosts im sad
             f"**Boost Progress Bar Enabled?** {utils.Emojis.bool(guild.premium_progress_bar_enabled)}",
             f"**Invites**: {invites}",
-            f"**Invites Paused?** {utils.Emojis.bool('INVITES_DISABLED' in guild.features)}"
+            f"**Invites Paused?** {utils.Emojis.bool('INVITES_DISABLED' in guild.features)}",
             f"**Webhooks**: {webhooks}",
             f"**Bans**: {bans}",
+            f"**AutoModeration Rules:** {automod_rules}",
             f"**Categories**: {len(guild.categories)}",
             f"**Text Channels**: {len(guild.text_channels)}",
             f"**Voice Channels**: {len(guild.voice_channels)}",
@@ -383,17 +386,9 @@ class Info(commands.Cog):
     async def get_user_avatar(self, ctx: discord.ApplicationContext, user: discord.User):
         return await self.avatar(ctx, user)
 
-    @commands.slash_command(name="user-info")
-    async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
-        """Shows you information about a user."""
-        embeds = []
-        user: Union[discord.User, discord.Member]
-        user = user or ctx.user
-        update = None
-        if user == self.bot.user:
-            await ctx.defer(ephemeral=True)
-            appinfo = await self.bot.application_info()
-            latency = round(self.bot.latency * 1000, 2)
+    async def get_my_info(self):
+        # this is THE only time im going to use an async generator in my life
+        async def get_spanner_version() -> str:
             try:
                 proc: subprocess.CompletedProcess = await utils.run_blocking(
                     subprocess.run,
@@ -426,8 +421,6 @@ class Info(commands.Cog):
                         latest_version = await utils.session.get("https://github.com/repos/EEKIM10/spanner-v2/commits")
                         latest_version.raise_for_status()
                         latest_version = latest_version.json()[0]["sha"][: len(spanner_version)]
-                        if latest_version != spanner_version:
-                            update = latest_version
                     except (httpx.HTTPStatusError, json.JSONDecodeError, IndexError):
                         pass
 
@@ -437,8 +430,9 @@ class Info(commands.Cog):
                 )
                 spanner_version = proc.stdout.strip()
 
-            spanner_version = spanner_version or "unknown-git"
+            return spanner_version or "unknown-git"
 
+        async def get_system_version() -> str:
             if platform.system().lower() == "windows":
                 os_version = f"{platform.system()} {platform.release()}"
             else:  # linux
@@ -458,96 +452,111 @@ class Info(commands.Cog):
                     )
                     version_string += ", kernel version `%s`" % kernel_version.stdout.strip()
                     os_version = version_string
+            return os_version
 
-            sys_started = discord.utils.utcnow() - datetime.timedelta(seconds=time.monotonic())
+        ram_used = system_ram_used = system_ram_total = cpu_percent = system_cpu = 0.0
+        per_cpu = [0.0] * os.cpu_count()
+        disk_usage = (0.0, 1.0)
+        proc_id = 0
+        try:
+            import psutil
+        except ImportError:
+            psutil = None
+        else:
+            system_cpu = await utils.run_blocking(psutil.cpu_percent, 1)
+            per_cpu = [round(x, 1) for x in await utils.run_blocking(psutil.cpu_percent, 1, True)]
+            system_ram = await utils.run_blocking(psutil.virtual_memory)
+            system_ram_used = system_ram.used
+            system_ram_total = system_ram.total
+            process = psutil.Process()
+            with process.oneshot():
+                cpu_percent = await utils.run_blocking(process.cpu_percent, 1)
+                _mem_info = await utils.run_blocking(process.memory_full_info)
+                ram_used = _mem_info.uss
+                proc_id = process.pid
+            disk_usage = psutil.disk_usage(Path(__file__).drive or "/")
 
-            ram_used = system_ram_used = system_ram_total = cpu_percent = system_cpu = 0.0
-            per_cpu = [0.0] * os.cpu_count()
-            disk_usage = (0.0, 1.0)
-            proc_id = 0
-            try:
-                import psutil
-            except ImportError:
-                psutil = None
-            else:
-                system_cpu = await utils.run_blocking(psutil.cpu_percent, 1)
-                per_cpu = [round(x, 1) for x in await utils.run_blocking(psutil.cpu_percent, 1, True)]
-                system_ram = await utils.run_blocking(psutil.virtual_memory)
-                system_ram_used = system_ram.used
-                system_ram_total = system_ram.total
-                process = psutil.Process()
-                with process.oneshot():
-                    cpu_percent = await utils.run_blocking(process.cpu_percent, 1)
-                    _mem_info = await utils.run_blocking(process.memory_full_info)
-                    ram_used = _mem_info.uss
-                    proc_id = process.pid
-                disk_usage = psutil.disk_usage(Path(__file__).drive or "/")
-
-            embed = discord.Embed(
-                title="My Information:",
-                description=f"Owner: {appinfo.owner.mention}\n"
-                f"Bot public: {'Yes' if appinfo.bot_public else 'No'}\n"
-                f"Bot requires oauth2 grant: {'Yes' if appinfo.bot_require_code_grant else 'No'}",
-                colour=0x049319,
-                timestamp=discord.utils.utcnow(),
+        appinfo = await self.bot.application_info()
+        embed = discord.Embed(
+            title="My Information:",
+            description=f"Owner: {appinfo.owner.mention}\n"
+                        f"Bot public: {'Yes' if appinfo.bot_public else 'No'}\n"
+                        f"Bot requires oauth2 grant: {'Yes' if appinfo.bot_require_code_grant else 'No'}",
+            colour=0x049319,
+            timestamp=discord.utils.utcnow(),
+        )
+        if appinfo.terms_of_service_url:
+            embed.description += f"\n[Terms of Service]({appinfo.terms_of_service_url})"
+        if appinfo.privacy_policy_url:
+            embed.description += f"\n[Privacy Policy]({appinfo.privacy_policy_url})"
+        if appinfo.team:
+            embed.description += (
+                f"\nTeam: {appinfo.team.name}\n"
+                f"Team members: {', '.join(map(lambda u: u.mention, appinfo.team.members))}"
             )
-            if appinfo.terms_of_service_url:
-                embed.description += f"\n[Terms of Service]({appinfo.terms_of_service_url})"
-            if appinfo.privacy_policy_url:
-                embed.description += f"\n[Privacy Policy]({appinfo.privacy_policy_url})"
-            if appinfo.team:
-                embed.description += (
-                    f"\nTeam: {appinfo.team.name}\n"
-                    f"Team members: {', '.join(map(lambda u: u.mention, appinfo.team.members))}"
-                )
+        yield embed.copy()
 
+        latency = round(self.bot.latency * 1000, 2)
+        sys_started = discord.utils.utcnow() - datetime.timedelta(seconds=time.monotonic())
+        embed.add_field(
+            name="Timing information",
+            value=f"WebSocket Latency (ping): {latency}ms\n"
+                  f"Bot Started: {discord.utils.format_dt(self.bot.started_at, 'R')}\n"
+                  f"System Started: {discord.utils.format_dt(sys_started, 'R')}\n"
+                  f"Bot Last Connected: {discord.utils.format_dt(self.bot.last_logged_in, 'R')}\n"
+                  f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}",
+        )
+        yield embed.copy()
+
+        embed.add_field(
+            name="Cache & stats info",
+            value=f"Cached Users: {len(self.bot.users):,}\n"
+                  f"Guilds: {len(self.bot.guilds):,}\n"
+                  f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
+                  f"Total Emojis: {len(self.bot.emojis):,}\n"
+                  f"Cached Messages: {len(self.bot.cached_messages):,}",
+            inline=False,
+        )
+        yield embed.copy()
+
+        _v = await get_spanner_version()
+        _sv = await get_system_version()
+        embed.add_field(
+            name="Version info:",
+            value=f"Python Version: {sys.version.split(' ')[0]}\n"
+                  f"Pycord Version: {discord.__version__}\n"
+                  f"Bot Version: [v2#{_v}](https://github.com/EEKIM10/spanner-v2/tree/"
+                  f"{quote_plus(_v)})\n"
+                  f"OS Version: {_sv}",
+            inline=False,
+        )
+        yield embed.copy()
+
+        if psutil:
+            b = os.name != "nt"
+            disk_used_nice = humanize.naturalsize(disk_usage.used, binary=b)
+            disk_total_nice = humanize.naturalsize(disk_usage.total, binary=b)
+            proc_mem = humanize.naturalsize(ram_used, binary=b)
+            sys_mem_u = humanize.naturalsize(system_ram_used, binary=b)
+            sys_mem_t = humanize.naturalsize(system_ram_total, binary=b)
             embed.add_field(
-                name="Timing information",
-                value=f"WebSocket Latency (ping): {latency}ms\n"
-                f"Bot Started: {discord.utils.format_dt(self.bot.started_at, 'R')}\n"
-                f"System Started: {discord.utils.format_dt(sys_started, 'R')}\n"
-                f"Bot Last Connected: {discord.utils.format_dt(self.bot.last_logged_in, 'R')}\n"
-                f"Bot Created: {discord.utils.format_dt(self.bot.user.created_at, 'R')}",
-            )
-            embed.add_field(
-                name="Cache & stats info",
-                value=f"Cached Users: {len(self.bot.users):,}\n"
-                f"Guilds: {len(self.bot.guilds):,}\n"
-                f"Total Channels: {len(tuple(self.bot.get_all_channels())):,}\n"
-                f"Total Emojis: {len(self.bot.emojis):,}\n"
-                f"Cached Messages: {len(self.bot.cached_messages):,}",
+                name="System Stats",
+                value=f"CPU Usage: {system_cpu}% ({cpu_percent}% for this process, per-core: "
+                      f"{' '.join(map(lambda p: f'{p}%', per_cpu))})\n"
+                      f"RAM Usage: {sys_mem_u}/{sys_mem_t} ({proc_mem} for this process)\n"
+                      f"Disk Usage: {disk_used_nice}/{disk_total_nice}\n"
+                      f"Process ID: {proc_id}",
                 inline=False,
             )
-            embed.add_field(
-                name="Version info:",
-                value=f"Python Version: {sys.version.split(' ')[0]}\n"
-                f"Pycord Version: {discord.__version__}\n"
-                f"Bot Version: [v2#{spanner_version}](https://github.com/EEKIM10/spanner-v2/tree/"
-                f"{quote_plus(spanner_version)})\n"
-                f"OS Version: {os_version}",
-                inline=False,
-            )
-            if psutil:
-                b = os.name != "nt"
-                disk_used_nice = humanize.naturalsize(disk_usage.used, binary=b)
-                disk_total_nice = humanize.naturalsize(disk_usage.total, binary=b)
-                proc_mem = humanize.naturalsize(ram_used, binary=b)
-                sys_mem_u = humanize.naturalsize(system_ram_used, binary=b)
-                sys_mem_t = humanize.naturalsize(system_ram_total, binary=b)
-                embed.add_field(
-                    name="System Stats",
-                    value=f"CPU Usage: {system_cpu}% ({cpu_percent}% for this process, per-core: "
-                    f"{' '.join(map(lambda p: f'{p}%', per_cpu))})\n"
-                    f"RAM Usage: {sys_mem_u}/{sys_mem_t} ({proc_mem} for this process)\n"
-                    f"Disk Usage: {disk_used_nice}/{disk_total_nice}\n"
-                    f"Process ID: {proc_id}",
-                    inline=False,
-                )
-            if update is not None:
-                embed.set_footer(
-                    text=f"\N{warning sign} New version available: {update}. Run `pipx upgrade spanner` to update."
-                )
-            embeds.append(embed)
+            yield embed.copy()
+
+    @commands.slash_command(name="user-info")
+    async def user_info(self, ctx: discord.ApplicationContext, user: discord.User = None):
+        """Shows you information about a user."""
+        await ctx.defer()
+        embeds = []
+        user: Union[discord.User, discord.Member]
+        user = user or ctx.user
 
         if ctx.guild:
             old_user = user
@@ -565,7 +574,13 @@ class Info(commands.Cog):
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_author(name=ctx.user.display_name, icon_url=ctx.user.display_avatar.url)
         embeds.append(embed)
-        return await ctx.respond(embeds=embeds, ephemeral=user == self.bot.user)
+        interaction: discord.WebhookMessage = await ctx.respond(embeds=embeds, ephemeral=user == self.bot.user)
+        if user == self.bot.user:
+            embeds.append(discord.Embed(title="Loading metadata..."))
+            await interaction.edit(embeds=embeds)
+            async for update in self.get_my_info():
+                embeds[-1] = update
+                await interaction.edit(embeds=embeds)
 
     @commands.user_command(name="User Info")
     async def user_info_user_command(self, ctx: discord.ApplicationContext, user: Union[discord.User, discord.Member]):
