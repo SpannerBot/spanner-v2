@@ -409,20 +409,13 @@ class Info(commands.Cog):
                         "name": "spanner",
                         "version": "0.0.0a00000000",
                     }
-                    spanner_version_match = re.match(r"(\d\.\d\.\d)(a|b|rc|f)(\w+)", spanner_version_raw["version"])
+                    spanner_version_match = re.match(r"(\d\.\d\.\d)(a|b|rc|f|p)(\w+)", spanner_version_raw["version"])
                     try:
                         spanner_version = spanner_version_match.group(3)
                     except IndexError:
                         spanner_version = spanner_version_match.group()
                     except AttributeError:
                         spanner_version = "unknown-pipx"  # no match
-
-                    try:
-                        latest_version = await utils.session.get("https://github.com/repos/EEKIM10/spanner-v2/commits")
-                        latest_version.raise_for_status()
-                        latest_version = latest_version.json()[0]["sha"][: len(spanner_version)]
-                    except (httpx.HTTPStatusError, json.JSONDecodeError, IndexError):
-                        pass
 
             except FileNotFoundError:
                 proc = await utils.run_blocking(
