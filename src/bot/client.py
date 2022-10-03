@@ -356,7 +356,7 @@ class Bot(commands.Bot):
             case = await utils.create_error(context, exception)
             ephemeral = True
             if context.interaction.response.is_done():
-                original_message = await context.interaction.original_message()
+                original_message = await context.interaction.original_response()
                 ephemeral = original_message.flags.ephemeral
 
             if self.get_config_value("ERROR_CHANNEL"):

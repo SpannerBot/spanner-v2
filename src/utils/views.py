@@ -34,7 +34,7 @@ class AutoDisableView(View):
         try:
             if self.interaction is not None:
                 try:
-                    message = self.interaction.message or await self.interaction.original_message()
+                    message = self.interaction.message or await self.interaction.original_response()
                 except discord.HTTPException:
                     pass
                 else:
@@ -248,9 +248,9 @@ class EmbedCreatorView(AutoDisableView):
 
         interaction = interaction or self.ctx.interaction
         if update_view:
-            coro = interaction.edit_original_message(content=content, embed=embed, view=self)
+            coro = interaction.edit_original_response(content=content, embed=embed, view=self)
         else:
-            coro = interaction.edit_original_message(content=content, embed=embed)
+            coro = interaction.edit_original_response(content=content, embed=embed)
         await coro
 
     @staticmethod
@@ -327,7 +327,7 @@ class EmbedCreatorView(AutoDisableView):
         )
         await view.wait()
         self.embed.colour = view.chosen or discord.Colour.default()
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         await self.edit(embed=self.embed)
 
     @button(label="Change url")
@@ -420,7 +420,7 @@ class EmbedCreatorView(AutoDisableView):
             "The 'author' segment is the small text above the title.", view=view
         )
         await view.wait()
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         await self.edit(embed=self.embed)
 
     @button(label="Modify footer details")
@@ -431,7 +431,7 @@ class EmbedCreatorView(AutoDisableView):
             "The 'footer' segment is the small text at the very bottom of the embed.", view=view
         )
         await view.wait()
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         await self.edit(embed=self.embed)
 
     @button(label="Manage fields")
@@ -442,7 +442,7 @@ class EmbedCreatorView(AutoDisableView):
         await self.edit(update_view=True)
         new_interaction: discord.Interaction = await interaction.response.send_message(view=view)
         await view.wait()
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         self.enable_all_items()
         await self.edit(embed=self.embed, update_view=True)
 
@@ -456,14 +456,14 @@ class EmbedCreatorView(AutoDisableView):
         )
         await view.wait()
         msg = await view.choice.send(f"Sent by {interaction.user.mention}.", embed=self.embed)
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         self.enable_all_items()
         await self.edit("[message sent](%s)" % msg.jump_url, update_view=True)
 
     @button(label="Destroy", style=discord.ButtonStyle.danger, emoji="\U0001f5d1", row=3)
     async def destroy_us(self, _, interaction: discord.Interaction):
         await self.defer_invisible(interaction)
-        await interaction.delete_original_message(delay=0.01)
+        await interaction.delete_original_response(delay=0.01)
         self.stop()
 
 
@@ -771,7 +771,7 @@ class EmbedCreatorFieldManager(AutoDisableView):
             "Select a field to edit", view=view
         )
         await view.wait()
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         await self.parent.edit(embed=self.parent.embed)
 
     @button(label="Remove Field", style=discord.ButtonStyle.green)
@@ -782,7 +782,7 @@ class EmbedCreatorFieldManager(AutoDisableView):
             "Select a fields to remove", view=view
         )
         await view.wait()
-        await new_interaction.delete_original_message(delay=0.1)
+        await new_interaction.delete_original_response(delay=0.1)
         await self.parent.edit(embed=self.parent.embed)
 
     @button(label="Done", style=discord.ButtonStyle.primary)
@@ -864,7 +864,7 @@ class EmbedCreatorFieldManagerFieldEditor(AutoDisableView):
         self.selected_field = value, self.parent.embed.fields[value]
         self.enable_all_items()
         self.remove_item(self.select)
-        await interaction.edit_original_message(view=self)
+        await interaction.edit_original_response(view=self)
 
     @button(label="Edit", emoji="\N{pencil}", custom_id="edit", disabled=True)
     async def edit_selection(self, _, interaction: discord.Interaction):
@@ -949,7 +949,7 @@ class EmbedCreatorFieldManagerFieldRemover(AutoDisableView):
             if str(hash(field.name) + hash(field.value)) in self.select.values:
                 self.parent.embed.remove_field(self.parent.embed.fields.index(field))
         self.enable_all_items()
-        await interaction.edit_original_message(view=self)
+        await interaction.edit_original_response(view=self)
         await self.parent.edit(f"Removed {len(self.select.values)} fields.", embed=self.parent.embed)
         self.stop()
 
@@ -1109,7 +1109,7 @@ class ChannelSelectorView(View):
                 self.remove_item(child)
         self.add_item(self.create_selector())
         await interaction.response.defer(invisible=True)
-        await interaction.edit_original_message(view=self)
+        await interaction.edit_original_response(view=self)
 
     @button(label="Search", emoji="\U0001f50d")
     async def do_select_via_name(self, _, interaction: discord.Interaction):
@@ -1129,7 +1129,7 @@ class ChannelSelectorView(View):
                 break
         new = self.create_selector()
         self.add_item(new)
-        await interaction.edit_original_message(view=self)
+        await interaction.edit_original_response(view=self)
 
     @button(label="Cancel", emoji="\N{black square for stop}", style=discord.ButtonStyle.red)
     async def do_cancel(self, _, __):
@@ -1208,7 +1208,7 @@ class RoleSelectorView(View):
         new = self.create_selector()
         self.add_item(new)
         await interaction.response.defer(invisible=True)
-        await interaction.edit_original_message(view=self)
+        await interaction.edit_original_response(view=self)
 
     @button(label="Search", emoji="\U0001f50d")
     async def do_select_via_name(self, _, interaction: discord.Interaction):
@@ -1222,7 +1222,7 @@ class RoleSelectorView(View):
         self.remove_item(self.children[2])
         new = self.create_selector()
         self.add_item(new)
-        await interaction.edit_original_message(view=self)
+        await interaction.edit_original_response(view=self)
 
     @button(label="Cancel", emoji="\N{black square for stop}", style=discord.ButtonStyle.red)
     async def do_cancel(self, _, __):

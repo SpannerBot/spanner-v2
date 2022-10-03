@@ -231,7 +231,7 @@ class Moderation(commands.Cog):
         await self.log_case(ctx, case)
 
         try:
-            await ctx.guild.ban(user, reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=7)
+            await ctx.guild.ban(user, reason=f"Case#{case.entry_id!s}| " + reason, delete_message_seconds=7*86400)
         except discord.HTTPException as e:
             await case.delete()
             return await ctx.edit(content="Failed to ban user: {!s}".format(e), embed=None, view=None)
@@ -344,7 +344,7 @@ class Moderation(commands.Cog):
             await self.log_case(ctx, case)
 
             try:
-                await member.ban(reason=f"Case#{case.entry_id!s}| " + reason, delete_message_days=delete_messages)
+                await member.ban(reason=f"Case#{case.entry_id!s}| " + reason, delete_message_seconds=delete_messages * 86400)
             except discord.HTTPException as e:
                 await case.delete()
                 return await ctx.edit(content="Failed to ban user: {!s}".format(e), embed=None, view=None)
