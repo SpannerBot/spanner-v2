@@ -215,12 +215,13 @@ class Info(commands.Cog):
                 if getattr(guild.system_channel_flags, flag) is True:
                     system_channel_flags.append(name)
 
+        automod_rules = "Missing 'manage server' permission."
         if guild.me.guild_permissions.manage_guild:
             invites = len(await guild.invites())
-            automod_rules = len(await guild.fetch_auto_moderation_rules())
+            if "AUTO_MODERATION" in guild.features:
+                automod_rules = len(await guild.fetch_auto_moderation_rules())
         else:
             invites = "Missing 'manage server' permission."
-            automod_rules = "Missing 'manage server' permission."
 
         if guild.me.guild_permissions.manage_webhooks:
             webhooks = len(await guild.webhooks())
