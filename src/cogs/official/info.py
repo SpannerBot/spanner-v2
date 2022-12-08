@@ -376,7 +376,7 @@ class Info(commands.Cog):
             embeds.append(embed)
             if file:
                 files.append(file)
-            embeds = [
+            [
                 setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
                 for embed in embeds
             ]
