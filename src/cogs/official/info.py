@@ -397,7 +397,7 @@ class Info(commands.Cog):
         [
             setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
             for embed in embeds
-            if not embed.title.startswith("Failed")
+            if not (embed.title and embed.title.startswith("Failed"))
         ]
         embeds = embeds or [
             discord.Embed(description="?")
