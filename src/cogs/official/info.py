@@ -360,30 +360,49 @@ class Info(commands.Cog):
         files = []
         # N.B: There is no reason to use setattr() in this if block, but I'm lazy
         if hasattr(user, "guild_avatar") and user.guild_avatar is not None:
-            content, embed, file = await self.parse_avatar(user.guild_avatar)
-            setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
+            try:
+                content, embed, file = await self.parse_avatar(user.guild_avatar)
+            except discord.HTTPException:
+                embeds.append(
+                    discord.Embed(
+                        title="Failed to download server avatar.",
+                        description="This user recently changed their server avatar. Please wait a while (up to an hour) and try again."
+                    )
+                )
+            else:
+                setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
+                if content:
+                    await ctx.respond(content, embed=embed, file=file)
+                else:
+                    embeds.append(embed)
+                    if file:
+                        files.append(file)
+
+        try:
+            content, embed, file = await self.parse_avatar(user.avatar)
+        except discord.NotFound:
+            embeds.append(
+                discord.Embed(
+                    title="Failed to download global avatar.",
+                    description="This user recently changed their server avatar. Please wait a while (up to an hour) and try again."
+                )
+            )
+        else:
             if content:
                 await ctx.respond(content, embed=embed, file=file)
             else:
                 embeds.append(embed)
                 if file:
                     files.append(file)
-
-        content, embed, file = await self.parse_avatar(user.avatar)
-        if content:
-            await ctx.respond(content, embed=embed, file=file)
-        else:
-            embeds.append(embed)
-            if file:
-                files.append(file)
-            [
-                setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
-                for embed in embeds
-            ]
-            embeds = embeds or [
-                discord.Embed(description="?")
-            ]
-            return await ctx.respond(None, embeds=embeds, files=files)
+        [
+            setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
+            for embed in embeds
+            if not embed.title.startswith("Failed")
+        ]
+        embeds = embeds or [
+            discord.Embed(description="?")
+        ]
+        return await ctx.respond(None, embeds=embeds, files=files or None)
 
     @commands.user_command(name="Avatar")
     @commands.bot_has_permissions(embed_links=True, attach_files=True)
