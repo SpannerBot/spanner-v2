@@ -380,6 +380,9 @@ class Info(commands.Cog):
                 setattr(embed, "description", f"Avatar for {user.mention} ({user}):")
                 for embed in embeds
             ]
+            embeds = embeds or [
+                discord.Embed(description="?")
+            ]
             return await ctx.respond(None, embeds=embeds, files=files)
 
     @commands.user_command(name="Avatar")
