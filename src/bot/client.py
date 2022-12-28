@@ -84,7 +84,7 @@ class Bot(commands.Bot):
             intents=INTENTS,
             chunk_guilds_on_startup=False,
             status=discord.Status.idle,
-            activity=discord.Activity(name="s!help | check my bio!", type=discord.ActivityType.watching),
+            activity=discord.Activity(name="you.", type=discord.ActivityType.watching),
             allowed_mentions=discord.AllowedMentions(
                 everyone=False,
                 users=True,

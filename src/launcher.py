@@ -41,12 +41,24 @@ async def launch():
     from src.bot.client import bot as bot_instance
 
     bot_instance.console.log("Preparing to launch spanner...")
+    log_path = bot_instance.get_config_value("log_path", "log_file", default=None)
+    if log_path:
+        log_path = Path(log_path).expanduser().absolute().resolve()
+        if log_path.is_dir():
+            log_path = log_path / "spanner.log"
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.touch(exist_ok=True)
+        except OSError as e:
+            bot_instance.console.log(f"[red]Error setting custom log file: {e}; defaulting.")
+            log_path = None
 
-    if Path("~/.local").exists():
-        log_path = Path("~/.local/share/spanner-v2/spanner.log")
-        log_path.mkdir(parents=True, exist_ok=True)
-    else:
-        log_path = Path("spanner.log")
+    if not log_path:
+        if Path("~/.local").expanduser().exists():
+            log_path = Path("~/.local/share/spanner-v2/spanner.log").expanduser()
+            log_path.mkdir(parents=True, exist_ok=True)
+        else:
+            log_path = Path("spanner.log")
     bot_instance.console.log("Log is located at %s." % (log_path.absolute()))
 
     logging.basicConfig(
