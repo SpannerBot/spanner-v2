@@ -56,7 +56,7 @@ async def launch():
     if not log_path:
         if Path("~/.local").expanduser().exists():
             log_path = Path("~/.local/share/spanner-v2/spanner.log").expanduser()
-            log_path.mkdir(parents=True, exist_ok=True)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
         else:
             log_path = Path("spanner.log")
     bot_instance.console.log("Log is located at %s." % (log_path.absolute()))
