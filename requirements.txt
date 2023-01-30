@@ -11,7 +11,7 @@ httpx==0.23.0
 psutil==5.9.2
 
 jishkucord==2.5.2
-greenlet==1.1.3
+greenlet==2.0.2
 aiofiles==22.1.0
 beautifulsoup4==4.11.1
 setproctitle==1.3.2
