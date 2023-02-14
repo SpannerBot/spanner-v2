@@ -432,9 +432,9 @@ class Info(commands.Cog):
                         "name": "spanner",
                         "version": "0.0.0a00000000",
                     }
-                    spanner_version_match = re.match(r"(\d\.\d\.\d)(a|b|rc|f|p)(\w+)", spanner_version_raw["version"])
+                    spanner_version_match = re.match(r"(\d\.\d\.\d)(?:\.)(a|b|rc|f|p|dev)(\w+)", spanner_version_raw["version"])
                     try:
-                        spanner_version = spanner_version_match.group(3)
+                        spanner_version = spanner_version_match.group()
                     except IndexError:
                         spanner_version = spanner_version_match.group()
                     except AttributeError:
