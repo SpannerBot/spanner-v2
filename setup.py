@@ -2,7 +2,7 @@ import subprocess
 
 from setuptools import setup, find_packages
 
-spanner_version = subprocess.run(("git", "rev-list", "--count", "HEAD")), capture_output=True, encoding="utf-8")
+spanner_version = subprocess.run(("git", "rev-list", "--count", "HEAD"), capture_output=True, encoding="utf-8")
 spanner_version = spanner_version.stdout.strip()
 
 with open("requirements.txt") as requirements_txt:
