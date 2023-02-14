@@ -9,7 +9,6 @@ from typing import Union, List
 import discord
 import httpx
 import orm
-from discord.ext import bridge
 from discord.ext import commands, pages as pagination
 from humanize import naturalsize, naturaltime
 
@@ -74,7 +73,7 @@ class Debug(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
-    @bridge.slash_command(name="ping")
+    @commands.slash_command(name="ping")
     async def ping(self, ctx: discord.ApplicationContext):
         """Shows the bot's latency."""
         await ctx.respond(f"Pong! {round(self.bot.latency * 1000, 2)}ms")
