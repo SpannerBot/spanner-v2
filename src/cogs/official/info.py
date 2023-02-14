@@ -415,7 +415,7 @@ class Info(commands.Cog):
             try:
                 proc: subprocess.CompletedProcess = await utils.run_blocking(
                     subprocess.run,
-                    ("pipx", "runpip", "spanner", "list", "--format=json"),
+                    ("python3", "-m", "pipx", "runpip", "spanner", "list", "--format=json"),
                     capture_output=True,
                     encoding="utf-8",
                 )
