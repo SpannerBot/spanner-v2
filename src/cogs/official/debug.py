@@ -74,7 +74,7 @@ class Debug(commands.Cog):
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
-    @bridge.bridge_command(name="ping")
+    @bridge.slash_command(name="ping")
     async def ping(self, ctx: discord.ApplicationContext):
         """Shows the bot's latency."""
         await ctx.respond(f"Pong! {round(self.bot.latency * 1000, 2)}ms")
