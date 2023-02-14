@@ -11,7 +11,7 @@ with open("requirements.txt") as requirements_txt:
 
 setup(
     name="spanner",
-    version="2.1.0p1" + spanner_version,
+    version="2.1.0p1+" + spanner_version,
     py_modules=["spanner"],
     packages=find_packages(),
     install_requires=requirements,
