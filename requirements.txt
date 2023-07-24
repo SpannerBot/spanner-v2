@@ -20,4 +20,4 @@ validators==0.20.0
 # Do we actually use cronitor? Furthermore do we *require* it?
 fastapi~=0.83
 uvicorn[standard]~=0.18
-humanize==4.3.0
+humanize==4.7.0
