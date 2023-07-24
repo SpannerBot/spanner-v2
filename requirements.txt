@@ -3,7 +3,7 @@ orjson==3.8.0; sys.platform != "win32" and "64" in platform.machine
 # ^ We don't install orjson on Windows due to a lack of a native C compiler.
 # OrJSON is also 64bit only.
 python-dotenv==0.21.0
-rich==12.5.1
+rich==13.4.2
 orm[sqlite]==0.3.1
 httpx==0.23.0
 
