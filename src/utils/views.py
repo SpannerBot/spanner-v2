@@ -134,13 +134,17 @@ class StealEmojiView(AutoDisableView):
     @button(label="Steal", style=ButtonStyle.green, emoji="\U00002b07\U0000fe0f")
     async def steal_emoji(self, btn: discord.Button, interaction: discord.Interaction):
         if not interaction.user.guild:
-            btn.disabled = True
             await interaction.message.edit(view=self)
             await interaction.response.send_message("You should not be able to see this button in DMs?")
             self.stop()
             return
 
         ephemeral = not interaction.channel.permissions_for(interaction.user).send_messages
+
+        if not isinstance(self.emoji, discord.Emoji):
+            if not self.emoji.is_custom_emoji():
+                await interaction.response.send_message("Can't steal non-custom emojis.", ephemeral=ephemeral)
+                self.stop()
 
         if not interaction.user.guild_permissions.manage_emojis:
             return await interaction.response.send_message(
@@ -173,13 +177,22 @@ class StealEmojiView(AutoDisableView):
                 ),
             )
         except discord.HTTPException as e:
-            return await interaction.response.send_message(
-                "Something went wrong while creating the emoji.\n" + str(e), ephemeral=ephemeral
-            )
+            if e.code == 50138:
+                return await interaction.followup.send(
+                    "That emoji is too large to steal (is over 256 Kilobytes, somehow).",
+                    ephemeral=ephemeral
+                )
+            else:
+                return await interaction.followup.send(
+                    "Something went wrong while creating the emoji.\n" + str(e), ephemeral=ephemeral
+                )
         else:
             btn.disabled = True
+            btn.label = "Stolen"
+            btn.emoji = new_emoji
+            btn.style = ButtonStyle.grey
             await interaction.message.edit(view=self)
-            await interaction.followup.send(f"Emoji stolen! `{new_emoji!s}`", ephemeral=ephemeral)
+            await interaction.followup.send(f"Emoji stolen! `{new_emoji!s}` -> {new_emoji}", ephemeral=ephemeral)
             self.stop()
 
 
