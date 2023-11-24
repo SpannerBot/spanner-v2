@@ -62,9 +62,10 @@ async def launch():
             log_path = Path("spanner.log")
     bot_instance.console.log("Log is located at %s." % (log_path.absolute()))
 
+    LOG_LEVEL = bot_instance.get_config_value("log_level") or logging.INFO
     logging.basicConfig(
         filename=log_path,
-        level=bot_instance.get_config_value("log_level") or logging.INFO,
+        level=LOG_LEVEL,
         filemode="a",
         format="%(asctime)s:%(name)s:%(levelname)s:%(message)s",
         datefmt="%d-%m-%Y %H:%M:%S",
@@ -72,7 +73,7 @@ async def launch():
         errors="replace",
     )
     # add a stream for stdout using rich handler
-    logging.getLogger().addHandler(RichHandler(console=bot_instance.console))
+    logging.getLogger().addHandler(RichHandler(level=LOG_LEVEL, console=bot_instance.console))
     logging.info("Starting log.")
     try:
         setproctitle("spanner")

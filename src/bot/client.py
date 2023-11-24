@@ -33,7 +33,9 @@ class Bot(commands.Bot):
 
     def __init__(self):
         self.errors = 0
-        self.console = Console()
+        import shutil
+        cols, lines = shutil.get_terminal_size((200, 40))
+        self.console = Console(width=cols or 200)
         self.console.log("Instance initialised")
         self.cronitor = None
         if os.getenv("COLOURS", "True").lower() == "false":
