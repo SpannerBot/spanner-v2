@@ -4,6 +4,7 @@ import os
 import sys
 import traceback
 from pathlib import Path
+from rich.logging import RichHandler
 
 import dotenv
 from setproctitle import setproctitle
@@ -70,6 +71,9 @@ async def launch():
         encoding="utf-8",
         errors="replace",
     )
+    # add a stream for stdout using rich handler
+    logging.getLogger().addHandler(RichHandler(console=bot_instance.console))
+    logging.info("Starting log.")
     try:
         setproctitle("spanner")
         bot_instance.console.log("Handing off launcher...")
