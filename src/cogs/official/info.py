@@ -1059,7 +1059,7 @@ class Info(commands.Cog):
                 description=f"**Name:** {emoji.name}\n"
                 f"**ID:** {emoji.id}\n"
                 f"**Created:** {discord.utils.format_dt(emoji.created_at, 'R')}\n"
-                f"**Format:** `{str(emoji)}`\n"
+                f"**Format:** `{str(emoji)}` ({str(emoji)})\n"
                 f"**Animated?:** {utils.Emojis.bool(emoji.animated)}\n"
                 f"**Custom?:** {utils.Emojis.bool(emoji.is_custom_emoji())}\n"
                 f"**URL:** {self.hyperlink(emoji.url)}\n",
@@ -1072,16 +1072,24 @@ class Info(commands.Cog):
             except commands.EmojiNotFound:
                 emoji_full = None
             else:
-                e.description += f"**Server name:** {emoji_full.guild.name if emoji_full.guild else 'N/A'}\n"
+                full_lines = [
+                    f"**Server name:** {emoji_full.guild.name if emoji_full.guild else 'N/A'}",
+                    f"**Managed by integration:** {utils.Emojis.bool(emoji_full.managed)}",
+                    f"**Available:** {utils.Emojis.bool(emoji_full.available)}",
+                ]
+                if emoji_full.roles:
+                    names = map(discord.Role.name, emoji_full.roles)
+                    full_lines.append(f"**Roles:** {', '.join(names)}")
+                text = textwrap.shorten("\n".join(full_lines), 3500)
+                e.description += text
             e.set_image(url=str(emoji.url))
             view = None
             if ctx.guild:
-                if ctx.author.guild_permissions.manage_emojis:
-                    if ctx.author.guild_permissions.manage_emojis:
-                        if len(ctx.guild.emojis) < ctx.guild.emoji_limit:
-                            if getattr(emoji_full, "guild", None) != ctx.guild:
-                                if discord.utils.get(ctx.guild.emojis, name=emoji.name) is None:
-                                    view = StealEmojiView(ctx.interaction, emoji=emoji_full or emoji)
+                if ctx.user.guild_permissions.manage_emojis:
+                    if len(ctx.guild.emojis) < ctx.guild.emoji_limit:
+                        if getattr(emoji_full, "guild", None) != ctx.guild:
+                            if discord.utils.get(ctx.guild.emojis, name=emoji.name) is None:
+                                view = StealEmojiView(ctx.interaction, emoji=emoji_full or emoji)
             return await ctx.respond(embed=e, view=view)
 
     @commands.message_command(name="Emoji Info")
