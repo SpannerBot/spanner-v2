@@ -34,7 +34,7 @@ class Bot(commands.Bot):
     def __init__(self):
         self.errors = 0
         import shutil
-        cols, lines = shutil.get_terminal_size((200, 40))
+        cols, lines = shutil.get_terminal_size((150, 40))
         self.console = Console(width=cols or 200)
         self.console.log("Instance initialised")
         self.cronitor = None
