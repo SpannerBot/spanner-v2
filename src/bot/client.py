@@ -23,6 +23,7 @@ __all__ = ("Bot", "bot")
 
 
 INTENTS = discord.Intents.default()
+INTENTS.presences = True
 logger = logging.getLogger(__name__)
 
 
@@ -67,19 +68,13 @@ class Bot(commands.Bot):
                 db_model.database = Database(DatabaseURL("sqlite://" + str(cfg_dir / "spanner-v2" / "main.db")))
                 self.console.log("database is now located at: %s" % str(cfg_dir / "spanner-v2" / "main.db"))
 
-        if capi := self.get_config_value("CRONITOR_API_KEY") is not None:
-            from cronitor import Monitor
-
-            self.cronitor = Monitor(self.get_config_value("CRONITOR_TELEMETRY_NAME") or "Spanner-Bot", capi)
-            self.cronitor.ping(state="run", hostname=platform.node())
-
         for place in [self.home, self.user_cogs_directory, self.user_cogs_data_directory]:
             logger.info("Ensuring %s exists." % place.absolute())
             place.mkdir(parents=True, exist_ok=True)
 
         super().__init__(
             command_prefix=utils.get_prefix,
-            description="eek's personal helper, re-written! | source code: https://github.com/EEKIM10/spanner-v2",
+            description="nex's personal helper, re-written! | source code: https://github.com/nexy7574/spanner-v2",
             max_messages=5_000,
             intents=INTENTS,
             chunk_guilds_on_startup=False,
