@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Type, Union, TYPE_CHECKING, Any
 import discord
 import httpx
 from discord import ApplicationCommand
-from discord.ext import commands
+from discord.ext import commands, tasks
 from rich.console import Console
 
 from src.utils import utils
@@ -215,6 +215,7 @@ class Bot(commands.Bot):
 
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
+        self.ping_kuma.start()
         try:
             token = self._select_token()
             await super().start(token)
@@ -403,6 +404,16 @@ class Bot(commands.Bot):
                     await self.wait_for_network()
                 else:
                     break
+    
+    @tasks.loop(seconds=60)
+    async def ping_kuma(self):
+        if not self.is_ready():
+            await self.wait_until_ready()
+        client = httpx.AsyncClient()
+        url = self.get_config_value("kuma_url", None)
+        if url:
+            url = url.format(ping=round((self.latency or 30) * 1000, 2))
+            await client.get(url, follow_redirects=True)
 
     @staticmethod
     async def wait_for_network(roof: int = 30) -> int:
