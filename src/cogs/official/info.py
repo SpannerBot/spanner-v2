@@ -179,6 +179,8 @@ class Info(commands.Cog):
 
         if user.avatar is not None:
             values.append(f"**Avatar URL**: {self.hyperlink(user.avatar.url)}")
+        if user.banner is not None:
+            values.append(f"**Banner URL**: {self.hyperlink(user.banner.url)}")
 
         if user.bot is True:
             link = discord.utils.oauth_url(
