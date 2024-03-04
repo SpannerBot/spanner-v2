@@ -1,23 +1,21 @@
-py-cord==2.4.0
-orjson==3.8.0; sys.platform != "win32" and "64" in platform.machine
+py-cord~=2.4
+orjson~=3.8; sys.platform != "win32" and "64" in platform.machine
 # ^ We don't install orjson on Windows due to a lack of a native C compiler.
 # OrJSON is also 64bit only.
-python-dotenv==0.21.0
-rich==12.5.1
-orm[sqlite]==0.3.1
-httpx==0.23.0
+python-dotenv~=0.21
+rich~=13.7
+orm[sqlite]~=0.3
+httpx~=0.27
 
 # Don't install psutil on Windows
-psutil==5.9.2
+psutil~=5.9
 
-jishkucord==2.5.2
-greenlet==1.1.3
-aiofiles==22.1.0
-beautifulsoup4==4.11.1
-setproctitle==1.3.2
-validators==0.20.0
-# cronitor==4.5.0
-# Do we actually use cronitor? Furthermore do we *require* it?
-fastapi~=0.83
+jishkucord~=2.5
+greenlet~=1.1
+aiofiles~=23.2
+beautifulsoup4~=4.12
+setproctitle~=1.3
+validators~=0.20
+fastapi~=0.110
 uvicorn[standard]~=0.18
-humanize==4.3.0
+humanize~=4.9
