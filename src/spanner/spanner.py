@@ -11,9 +11,11 @@ import click
 from rich.console import Console
 from rich.tree import Tree
 
-from .utils import load_colon_int_list
-
 os.chdir(Path(__file__).parent)
+sys.path.extend(str(Path.cwd().resolve()))
+print("Path: %r", ":".join(sys.path))
+
+from .utils import load_colon_int_list
 
 
 def get_file_tree(directory: Path = None, tree: Tree = None) -> Tree:

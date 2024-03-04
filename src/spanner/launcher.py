@@ -9,9 +9,6 @@ from rich.logging import RichHandler
 import dotenv
 from setproctitle import setproctitle
 
-sys.path.extend(str(Path(__file__).parent.resolve()))
-print("Path: %r", ":".join(sys.path))
-
 dotenv.load_dotenv()
 
 os.environ["JISHAKU_RETAIN"] = "true"
