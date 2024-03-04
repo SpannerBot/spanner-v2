@@ -6,8 +6,8 @@ from discord import SlashCommandGroup
 from discord.commands import Option
 from discord.ext import commands
 
-from .bot.client import Bot
-from .utils.views import EmbedCreatorView, AutoDisableView
+from bot.client import Bot
+from utils.views import EmbedCreatorView, AutoDisableView
 
 logger = logging.getLogger(__name__)
 

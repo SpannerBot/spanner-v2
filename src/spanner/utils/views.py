@@ -13,8 +13,8 @@ from discord.ui import View, button, Select, Modal, InputText
 from discord.webhook.async_ import async_context
 
 if TYPE_CHECKING:
-    from src.database.models import Guild, ReactionRoles, ReactionRoleMenu
-    from src.bot import Bot
+    from database.models import Guild, ReactionRoles, ReactionRoleMenu
+    from bot import Bot
 
 __all__ = ("YesNoPrompt", "StealEmojiView", "EmbedCreatorView", "PersistentReactionRolesView")
 

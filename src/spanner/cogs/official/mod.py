@@ -7,9 +7,9 @@ import discord
 from discord import SlashCommandGroup
 from discord.ext import commands, pages
 
-from .database import Cases, CaseType, Guild, NoMatch
-from .utils import utils
-from .utils.views import YesNoPrompt
+from database import Cases, CaseType, Guild, NoMatch
+from utils import utils
+from utils.views import YesNoPrompt
 
 
 class PermissionsError(commands.CommandError):

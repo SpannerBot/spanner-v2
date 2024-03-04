@@ -21,9 +21,9 @@ import unicodedata
 from bs4 import BeautifulSoup
 from discord.ext import commands, pages
 
-from . import utils
-from .bot.client import Bot
-from .utils.views import StealEmojiView
+import utils
+from bot.client import Bot
+from utils.views import StealEmojiView
 
 verification_levels = {
     discord.VerificationLevel.none: "Unrestricted",
