@@ -12,7 +12,7 @@ import discord
 import httpx
 from discord.ext import commands
 
-from src.database.models import Guild, CommandType, Errors
+from database.models import Guild, CommandType, Errors
 
 __all__ = (
     "case_type_names",

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=67.8.0", "wheel>=0.40.0", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "spanner"
+description = "Version 2 of the discord spanner bot"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.9"   
+license = { text = "GNU AGPLv3" }
+authors = [
+    {name = "Nexus", email = "bots@nexy7574.co.uk"}
+]
+dynamic = ["version", "dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = "requirements.txt"}
+
+[project.scripts]
+spanner-cli = "spanner:cli"
+
+[project.optional-dependencies]
+monitoring = ["cronitor~=4.6"]
+
+[tool.setuptools_scm]
+write_to = "src/__version__.py"
