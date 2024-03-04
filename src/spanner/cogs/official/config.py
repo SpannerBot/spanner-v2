@@ -1,9 +1,7 @@
-import random
-
 import discord
 from discord.ext import commands
 
-from src.utils import get_guild_config, utils, views
+from .utils import get_guild_config
 
 
 async def is_owner(ctx: discord.ApplicationContext) -> bool:

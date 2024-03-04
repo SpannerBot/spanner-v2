@@ -11,7 +11,7 @@ import click
 from rich.console import Console
 from rich.tree import Tree
 
-from src.utils import load_colon_int_list
+from .utils import load_colon_int_list
 
 os.chdir(Path(__file__).parent)
 

@@ -12,9 +12,9 @@ import orm
 from discord.ext import commands, pages as pagination, tasks
 from humanize import naturalsize, naturaltime
 
-from src.bot.client import Bot
-from src.database import Errors, models
-from src.utils import utils
+from .bot.client import Bot
+from .database import Errors, models
+from .utils import utils
 
 
 async def get_similar_case_ids(ctx: discord.AutocompleteContext) -> List[str]:
