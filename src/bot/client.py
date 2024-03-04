@@ -411,11 +411,11 @@ class Bot(commands.Bot):
     async def ping_kuma(self):
         if not self.is_ready():
             await self.wait_until_ready()
-        client = httpx.AsyncClient()
-        url = self.get_config_value("kuma_url", None)
-        if url:
-            url = url.format(ping=round((self.latency or 30) * 1000, 2))
-            await client.get(url, follow_redirects=True)
+        async with httpx.AsyncClient() as client:
+            url = self.get_config_value("kuma_url", None)
+            if url:
+                url = url.format(ping=round((self.latency or 30) * 1000, 2))
+                await client.get(url, follow_redirects=True)
 
     @staticmethod
     async def wait_for_network(roof: int = 30) -> int:
