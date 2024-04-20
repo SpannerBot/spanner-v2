@@ -309,14 +309,13 @@ def run(pass_path: bool = False):
         os.environ["PATH"] = p.stdout.strip() or os.environ["PATH"]
         click.echo(f"{get_time()} New path: %r" % os.environ["PATH"])
 
-    from src import launcher
-
+    from .launcher import launch
     click.echo(f"{get_time()} Launching bot...")
-    os.chdir(Path(launcher.__file__).parents[1])
-    click.echo(f"{get_time()} Changed working directory to %s." % Path(launcher.__file__).parents[1])
+    os.chdir(Path(__file__).parents[1])
+    click.echo(f"{get_time()} Changed working directory to %s." % Path(__file__).parents[1])
     try:
         click.echo(f"{get_time()} Handing off to launcher")
-        asyncio.run(launcher.launch())
+        asyncio.run(launch())
     finally:
         click.echo(f"{get_time()} Bot process finished.")
 
