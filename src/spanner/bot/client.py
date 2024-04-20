@@ -206,14 +206,14 @@ class Bot(commands.Bot):
                 required = True
             prefix = prefixes[ext[0]]
             ext = ext[1:]
-            dest = "src.cogs.%s.%s" % (prefix, ext) if prefix != "external" else ext
+            dest = "cogs.%s.%s" % (prefix, ext) if prefix != "external" else ext
             try_load(dest, prefix, required)
 
         for user_ext in (self.home / "cogs" / "user" / "cogs").glob("*.py"):
             if user_ext.name.startswith("."):
                 self.console.log("[i]Skipping loading user cog %r - disabled." % user_ext.name[1:-3])
             else:
-                try_load("src.cogs.user.cogs." + user_ext.name[:-3], "user", False)
+                try_load("cogs.user.cogs." + user_ext.name[:-3], "user", False)
 
         self.console.log("Starting bot...")
         self.started_at = discord.utils.utcnow()
