@@ -13,7 +13,6 @@ from rich.tree import Tree
 
 os.chdir(Path(__file__).parent)
 sys.path.extend(str(Path.cwd().resolve()))
-print("Path: %r", ":".join(sys.path))
 
 from .utils import load_colon_int_list
 
