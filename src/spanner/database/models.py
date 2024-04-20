@@ -49,7 +49,7 @@ class Guild(orm.Model):
     registry = models
     fields = {
         "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4),
-        "id": orm.BigInteger(unique=True, index=True),
+        "id": orm.BigInteger(unique=True),
         "prefix": orm.String(min_length=1, max_length=16, default="s!"),
         "log_channel": orm.BigInteger(allow_null=True, default=None),
         "disable_snipe": orm.Boolean(default=False),
@@ -90,7 +90,7 @@ class ReactionRoles(orm.Model):
     registry = models
     fields = {
         "entry_id": orm.UUID(primary_key=True, default=uuid.uuid4()),
-        "id": orm.BigInteger(unique=True, index=True),  # guild_id
+        "id": orm.BigInteger(unique=True),  # guild_id
         "guild": orm.ForeignKey(Guild),
         "message_id": orm.BigInteger(),
         "emoji": orm.String(min_length=1, max_length=16),
