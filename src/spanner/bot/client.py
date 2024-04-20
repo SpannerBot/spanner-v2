@@ -16,8 +16,8 @@ from discord import ApplicationCommand
 from discord.ext import commands, tasks
 from rich.console import Console
 
-from ..utils import utils
-from ..database.models import models as db_model
+from utils import utils
+from database.models import models as db_model
 
 __all__ = ("Bot", "bot")
 
