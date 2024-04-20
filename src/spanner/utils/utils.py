@@ -133,7 +133,7 @@ async def run_blocking(func: Callable, *args, **kwargs) -> Optional[Any]:
     Returns:
         The return value of the function.
     """
-    from src.bot.client import bot
+    from bot.client import bot
 
     return await bot.loop.run_in_executor(None, partial(func, *args, **kwargs))
 

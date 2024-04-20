@@ -57,7 +57,7 @@ nsfw_levels = {
 
 
 async def unfurl_invite_url(url: str) -> Union[Tuple[str, re.Match], Tuple[None, None]]:
-    from src.bot.client import bot
+    from bot.client import bot
 
     # bot.console.log(f"(UNFURLER) Preparing to unfurl {url}")
     # Dear maintainers,

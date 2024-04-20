@@ -219,7 +219,7 @@ class Debug(commands.Cog):
             return await ctx.send("Seconds must be a multiple of 5.")
 
         try:
-            from src.utils import Tracer
+            from utils import Tracer
         except ImportError:
             return await ctx.send("Tracer is not ready.")
 
