@@ -95,7 +95,6 @@ class Bot(commands.Bot):
         self.debug = is_debug and guild_ids is not None and len(guild_ids) > 0
         self.terminal = self.console
         self.started_at = self.last_logged_in = None
-        self.loop.run_until_complete(db_model.create_all())
         logger.debug("Project home is at %r, and CWD is %r." % (str(self.home.absolute()), str(os.getcwd())))
 
         if self.owner_ids is not None:

@@ -8,6 +8,7 @@ from rich.logging import RichHandler
 
 import dotenv
 from setproctitle import setproctitle
+from .database.models import models
 
 dotenv.load_dotenv()
 
@@ -21,6 +22,9 @@ async def main(bot):
 
         if bot.get_config_value("fancy_tracebacks"):
             install(console=bot.console, show_locals=True)
+
+        logging.info("Initialising database")
+        await models.create_all()
 
         bot.console.log("Starting connections...")
         await bot.launch()
@@ -75,6 +79,7 @@ async def launch():
     # add a stream for stdout using rich handler
     logging.getLogger().addHandler(RichHandler(level=LOG_LEVEL, console=bot_instance.console))
     logging.info("Starting log.")
+
     try:
         setproctitle("spanner")
         bot_instance.console.log("Handing off launcher...")
