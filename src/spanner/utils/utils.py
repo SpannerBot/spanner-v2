@@ -160,11 +160,11 @@ async def get_guild_config(
 
 async def get_prefix(_, message: discord.Message) -> List[str]:
     default = commands.when_mentioned_or("s!")
-    if not message.guild:
-        return default(_, message)
+    # if not message.guild:
+    return default(_, message)
 
-    guild, __ = await Guild.objects.get_or_create({}, id=message.guild.id)
-    return commands.when_mentioned_or(guild.prefix)(_, message)
+    # guild, __ = await Guild.objects.get_or_create({}, id=message.guild.id)
+    # return commands.when_mentioned_or(guild.prefix)(_, message)
 
 
 def format_time(seconds: int):
