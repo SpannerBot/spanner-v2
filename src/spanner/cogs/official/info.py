@@ -242,6 +242,12 @@ class Info(commands.Cog):
         if guild.owner is None:
             await guild.query_members(user_ids=[guild.owner_id], cache=True)
 
+        if len(guild.members) == guild.member_count:
+            humans = len([x for x in guild.members if not x.bot])
+            bots = len([x for x in guild.members if x.bot])
+        else:
+            bots = humans = None
+
         # noinspection PyUnresolvedReferences
         values = [
             f"**ID**: `{guild.id}`",
@@ -291,6 +297,8 @@ class Info(commands.Cog):
             f"**Max Video Channel Users**: {guild.max_video_channel_users}",
             f"**Scheduled Events**: {len(guild.scheduled_events)}",
         ]
+        if bots is not None:
+            values.insert(14, f"- **Humans**: {humans:,}\n- **Bots**: {bots:,}")
         values = list(filter(lambda x: x is not None, values))
         embed = discord.Embed(
             title=f"{guild.name} ({guild.id})",
@@ -308,7 +316,7 @@ class Info(commands.Cog):
 
     @staticmethod
     def first_line(text: str, max_length: int = 100, placeholder: str = "...") -> str:
-        line = text.splitlines(False)[0]
+        line = text.splitlines()[0]
         return textwrap.shorten(line, max_length, placeholder=placeholder)
 
     @staticmethod

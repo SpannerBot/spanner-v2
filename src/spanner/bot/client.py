@@ -24,6 +24,7 @@ __all__ = ("Bot", "bot")
 
 INTENTS = discord.Intents.default()
 INTENTS.presences = True
+INTENTS.members = True
 logger = logging.getLogger(__name__)
 
 
